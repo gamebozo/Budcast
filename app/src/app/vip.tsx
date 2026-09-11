@@ -11,6 +11,7 @@ import {
 import { FloatingNavBar } from '../components/FloatingNavBar';
 import { BudcastLogo } from '../components/BudcastLogo';
 import { setFounderVipPass, getActivePlan, ActivePlanData } from '../services/hostStorage';
+import { getApiBaseUrl } from '../services/apiConfig';
 
 export default function VipRedemptionScreen() {
   const router = useRouter();
@@ -51,8 +52,8 @@ export default function VipRedemptionScreen() {
     setLoading(true);
 
     try {
-      const host = Platform.OS === 'web' ? window.location.hostname : '10.197.78.102';
-      const response = await fetch(`http://${host}:4000/api/prelaunch/verify-vip`, {
+      const baseUrl = getApiBaseUrl();
+      const response = await fetch(`${baseUrl}/api/prelaunch/verify-vip`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code: trimmed })

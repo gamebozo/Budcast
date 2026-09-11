@@ -1,16 +1,12 @@
 import { io, Socket } from 'socket.io-client';
 import { Platform } from 'react-native';
 import { syncEngine } from './syncEngine';
+import { getSocketUrl } from './apiConfig';
 
 let socket: Socket | null = null;
 
 export function getSocketServerUrl(): string {
-  if (Platform.OS === 'web' && typeof window !== 'undefined') {
-    const host = window.location.hostname || 'localhost';
-    return `http://${host}:4000`;
-  }
-  // Default fallback for physical devices or emulators
-  return 'http://192.168.1.1:4000';
+  return getSocketUrl();
 }
 
 export function initSocket(customUrl?: string): Socket {

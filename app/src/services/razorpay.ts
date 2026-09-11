@@ -1,5 +1,6 @@
 import { Platform } from 'react-native';
 import { getHostId, setActivePlan, ActivePlanData } from './hostStorage';
+import { getApiBaseUrl } from './apiConfig';
 
 declare global {
   interface Window {
@@ -7,7 +8,7 @@ declare global {
   }
 }
 
-const BACKEND_URL = 'http://localhost:4000';
+const BACKEND_URL = getApiBaseUrl();
 
 /**
  * Dynamically load Razorpay standard checkout script on Web
