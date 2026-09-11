@@ -260,8 +260,9 @@ export async function sendWelcomeEmail({ email, queueNumber, referralCode, role 
           pass: smtpPass
         }
       });
+      const senderAddress = smtpHost.includes('gmail.com') ? `Budcast VIP <${smtpUser}>` : fromEmail;
       const info = await transporter.sendMail({
-        from: fromEmail,
+        from: senderAddress,
         to: email,
         subject,
         html,
