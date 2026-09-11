@@ -1,0 +1,32 @@
+# Environment & Secrets
+.env
+.env.local
+.env.*.local
+*.env
+*.pem
+*.key
+*.cert
+
+# Node Modules & Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# SQLite Database & Uploads
+backend/*.db
+backend/*.db-journal
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# Build and Temp files
+dist/
+build/
+.expo/
+web-build/
+*.log
+npm-debug.log*
+yarn-debug.log*
+
+# OS Files
+.DS_Store
+Thumbs.db

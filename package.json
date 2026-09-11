@@ -1,0 +1,13 @@
+{
+  "name": "budcast-workspace",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Budcast - Microsecond multi-earbud audio sharing & silent disco platform",
+  "scripts": {
+    "start": "node backend/server.js",
+    "build": "npm install --prefix backend",
+    "backend": "node backend/server.js",
+    "backend:dev": "node --watch backend/server.js",
+    "app": "npm start --prefix app"
+  }
+}
