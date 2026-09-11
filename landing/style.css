@@ -1520,21 +1520,62 @@ body {
 
   /* Comparison Table Mobile Scroll */
   .table-swipe-hint {
-    display: flex;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 6px;
-    font-size: 11px;
+    gap: 8px;
+    font-size: 11.5px;
     font-weight: 800;
     color: var(--cyan-bright);
-    margin-bottom: 12px;
-    background: rgba(56, 189, 248, 0.08);
-    border: 1px solid rgba(56, 189, 248, 0.2);
-    padding: 6px 14px;
+    margin-bottom: 14px;
+    background: rgba(56, 189, 248, 0.1);
+    border: 1px solid rgba(56, 189, 248, 0.3);
+    padding: 7px 16px;
     border-radius: 999px;
     width: fit-content;
     margin-left: auto;
     margin-right: auto;
+    box-shadow: 0 0 15px rgba(0, 242, 254, 0.15);
+  }
+
+  .swipe-arrow-right {
+    display: inline-block;
+    animation: bounceRight 1.2s ease-in-out infinite;
+  }
+
+  .swipe-arrow-left {
+    display: inline-block;
+    animation: bounceLeft 1.2s ease-in-out infinite;
+  }
+
+  @keyframes bounceRight {
+    0%, 100% { transform: translateX(0); }
+    50% { transform: translateX(6px); }
+  }
+
+  @keyframes bounceLeft {
+    0%, 100% { transform: translateX(0); }
+    50% { transform: translateX(-6px); }
+  }
+
+  .table-scroll-container {
+    position: relative;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .table-edge-fade {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 50px;
+    background: linear-gradient(to right, transparent, rgba(5, 8, 20, 0.95));
+    pointer-events: none;
+    border-top-right-radius: 14px;
+    border-bottom-right-radius: 14px;
+    transition: opacity 0.3s ease;
+    z-index: 6;
   }
 
   .comparison-table-wrapper {
@@ -1574,6 +1615,39 @@ body {
 
   .comparison-table td:first-child {
     background: #0D1527;
+  }
+
+  .table-scroll-bar-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    margin-top: 14px;
+  }
+
+  .table-scroll-bar {
+    width: 140px;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 999px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .table-scroll-thumb {
+    width: 40%;
+    height: 100%;
+    background: var(--cyan);
+    border-radius: 999px;
+    transition: transform 0.08s ease-out;
+    box-shadow: 0 0 10px var(--cyan);
+  }
+
+  .table-scroll-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-dim);
+    letter-spacing: 0.5px;
   }
 
   /* FAQ Mobile */

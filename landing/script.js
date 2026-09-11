@@ -198,4 +198,22 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   });
+
+  // 8. Comparison Table Horizontal Scroll Tracking
+  const comparisonTableWrapper = document.getElementById('comparisonTableWrapper');
+  const tableScrollThumb = document.getElementById('tableScrollThumb');
+  const tableEdgeFade = document.getElementById('tableEdgeFade');
+
+  if (comparisonTableWrapper && tableScrollThumb) {
+    comparisonTableWrapper.addEventListener('scroll', () => {
+      const maxScroll = comparisonTableWrapper.scrollWidth - comparisonTableWrapper.clientWidth;
+      if (maxScroll > 0) {
+        const scrollPercent = comparisonTableWrapper.scrollLeft / maxScroll;
+        tableScrollThumb.style.transform = `translateX(${scrollPercent * 150}%)`;
+        if (tableEdgeFade) {
+          tableEdgeFade.style.opacity = scrollPercent > 0.85 ? '0' : '1';
+        }
+      }
+    });
+  }
 });

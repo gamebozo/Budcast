@@ -407,72 +407,84 @@
         </div>
 
         <div class="table-swipe-hint">
-          <span>👉 Swipe table sideways to compare all features</span>
+          <span class="swipe-arrow-left">👈</span>
+          <span>Swipe table sideways to compare all 4 alternatives</span>
+          <span class="swipe-arrow-right">👉</span>
         </div>
 
-        <div class="comparison-table-wrapper">
-          <table class="comparison-table">
-            <thead>
-              <tr>
-                <th>Feature</th>
-                <th class="highlight-col">🎧 Budcast</th>
-                <th>RF Silent Disco Gear</th>
-                <th>Bluetooth Audio Sharing</th>
-                <th>Spotify Jam</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td><strong>Hardware Cost</strong></td>
-                <td class="highlight-col"><span class="badge-green">$0 (Use Existing Phones)</span></td>
-                <td>$1,500+ Rental / Gear</td>
-                <td>$0 (Same Brand Only)</td>
-                <td>$0 (Music Only)</td>
-              </tr>
-              <tr>
-                <td><strong>Simultaneous Listeners</strong></td>
-                <td class="highlight-col"><span class="badge-green">Dozens / Hundreds</span></td>
-                <td>Limited to Headsets</td>
-                <td>2 Headphones Max</td>
-                <td>Queue Only</td>
-              </tr>
-              <tr>
-                <td><strong>Sub-Millisecond Sync</strong></td>
-                <td class="highlight-col"><span class="badge-green">✓ 0.4ms Phase-Lock</span></td>
-                <td>✓ Analog Radio</td>
-                <td>❌ High Bluetooth Lag</td>
-                <td>❌ Seconds Out of Sync</td>
-              </tr>
-              <tr>
-                <td><strong>Offline Local Wi-Fi (0 Data)</strong></td>
-                <td class="highlight-col"><span class="badge-green">✓ 100% Offline</span></td>
-                <td>✓ RF Transmitters</td>
-                <td>✓ Local Bluetooth</td>
-                <td>❌ Requires Internet</td>
-              </tr>
-              <tr>
-                <td><strong>Movie & Video Lip-Sync</strong></td>
-                <td class="highlight-col"><span class="badge-green">✓ Full Video Sync</span></td>
-                <td>❌ Complex Audio Aux</td>
-                <td>❌ Significant Drift</td>
-                <td>❌ Audio Only</td>
-              </tr>
-              <tr>
-                <td><strong>3-Channel DJ Silent Disco</strong></td>
-                <td class="highlight-col"><span class="badge-green">✓ Red, Blue, Green Glow</span></td>
-                <td>✓ LED Headsets</td>
-                <td>❌ 1 Single Stream</td>
-                <td>❌ 1 Single Queue</td>
-              </tr>
-              <tr>
-                <td><strong>Live MC Talk-Over Mic</strong></td>
-                <td class="highlight-col"><span class="badge-green">✓ Built-in Mic Ducking</span></td>
-                <td>❌ Extra Mixer Needed</td>
-                <td>❌ Not Supported</td>
-                <td>❌ Not Supported</td>
-              </tr>
-            </tbody>
-          </table>
+        <div class="table-scroll-container">
+          <div class="comparison-table-wrapper" id="comparisonTableWrapper">
+            <table class="comparison-table">
+              <thead>
+                <tr>
+                  <th>Feature</th>
+                  <th class="highlight-col">🎧 Budcast</th>
+                  <th>RF Silent Disco Gear</th>
+                  <th>Bluetooth Audio Sharing</th>
+                  <th>Spotify Jam</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><strong>Hardware Cost</strong></td>
+                  <td class="highlight-col"><span class="badge-green">$0 (Use Existing Phones)</span></td>
+                  <td>$1,500+ Rental / Gear</td>
+                  <td>$0 (Same Brand Only)</td>
+                  <td>$0 (Music Only)</td>
+                </tr>
+                <tr>
+                  <td><strong>Simultaneous Listeners</strong></td>
+                  <td class="highlight-col"><span class="badge-green">Dozens / Hundreds</span></td>
+                  <td>Limited to Headsets</td>
+                  <td>2 Headphones Max</td>
+                  <td>Queue Only</td>
+                </tr>
+                <tr>
+                  <td><strong>Sub-Millisecond Sync</strong></td>
+                  <td class="highlight-col"><span class="badge-green">✓ 0.4ms Phase-Lock</span></td>
+                  <td>✓ Analog Radio</td>
+                  <td>❌ High Bluetooth Lag</td>
+                  <td>❌ Seconds Out of Sync</td>
+                </tr>
+                <tr>
+                  <td><strong>Offline Local Wi-Fi (0 Data)</strong></td>
+                  <td class="highlight-col"><span class="badge-green">✓ 100% Offline</span></td>
+                  <td>✓ RF Transmitters</td>
+                  <td>✓ Local Bluetooth</td>
+                  <td>❌ Requires Internet</td>
+                </tr>
+                <tr>
+                  <td><strong>Movie & Video Lip-Sync</strong></td>
+                  <td class="highlight-col"><span class="badge-green">✓ Full Video Sync</span></td>
+                  <td>❌ Complex Audio Aux</td>
+                  <td>❌ Significant Drift</td>
+                  <td>❌ Audio Only</td>
+                </tr>
+                <tr>
+                  <td><strong>3-Channel DJ Silent Disco</strong></td>
+                  <td class="highlight-col"><span class="badge-green">✓ Red, Blue, Green Glow</span></td>
+                  <td>✓ LED Headsets</td>
+                  <td>❌ 1 Single Stream</td>
+                  <td>❌ 1 Single Queue</td>
+                </tr>
+                <tr>
+                  <td><strong>Live MC Talk-Over Mic</strong></td>
+                  <td class="highlight-col"><span class="badge-green">✓ Built-in Mic Ducking</span></td>
+                  <td>❌ Extra Mixer Needed</td>
+                  <td>❌ Not Supported</td>
+                  <td>❌ Not Supported</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="table-edge-fade" id="tableEdgeFade"></div>
+        </div>
+
+        <div class="table-scroll-bar-wrapper">
+          <div class="table-scroll-bar">
+            <div class="table-scroll-thumb" id="tableScrollThumb"></div>
+          </div>
+          <span class="table-scroll-label">👈 Swipe to compare all 4 alternatives 👉</span>
         </div>
       </div>
     </section>
