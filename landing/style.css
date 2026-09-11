@@ -1357,49 +1357,257 @@ body {
   color: #64748B;
 }
 
-@media (max-width: 900px) {
-  .story-grid {
-    grid-template-columns: 1fr;
-  }
-  .story-card {
-    padding: 30px 20px;
-  }
-}
+/* ====================================================
+   Comprehensive Responsive & Mobile Design (1024px, 768px, 480px)
+   ==================================================== */
 
-/* Mobile Responsive */
-@media (max-width: 900px) {
-  .nav-links {
-    display: none;
-  }
-
+@media (max-width: 1024px) {
   .hero-grid {
     grid-template-columns: 1fr;
     gap: 40px;
   }
+  
+  .features-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .story-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .use-cases-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .container {
+    padding: 0 16px;
+  }
+
+  .navbar {
+    padding: 12px 0;
+  }
+
+  .nav-links {
+    display: none;
+  }
+
+  .launch-countdown {
+    display: none;
+  }
+
+  .hero-section {
+    padding: 30px 0 50px;
+  }
 
   .hero-title {
-    font-size: 34px;
+    font-size: clamp(26px, 7.5vw, 36px);
+    letter-spacing: -0.8px;
+    line-height: 1.2;
+    margin-bottom: 14px;
   }
 
-  .steps-grid, .use-cases-grid, .features-grid, .rewards-grid {
-    grid-template-columns: 1fr;
+  .hero-subtitle {
+    font-size: 15px;
+    margin-bottom: 22px;
   }
 
-  .channels-preview {
-    grid-template-columns: 1fr;
+  .form-wrapper {
+    padding: 20px 16px;
+    border-radius: 18px;
+  }
+
+  .role-pills {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+
+  .role-pill {
+    text-align: center;
+    padding: 10px 8px;
+    font-size: 12px;
   }
 
   .input-group {
     flex-direction: column;
+    gap: 10px;
+  }
+
+  .email-input {
+    width: 100%;
+    padding: 14px 16px;
+    font-size: 15px;
   }
 
   .btn-submit {
     width: 100%;
+    padding: 14px 20px;
+    font-size: 15px;
+  }
+
+  .form-meta {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .platform-radios {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  /* Live Demo Card Mobile Adjustments */
+  .live-demo-card {
+    padding: 20px 16px;
+  }
+
+  .channels-preview {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .chan-btn {
+    padding: 10px 14px;
+    font-size: 13px;
+  }
+
+  .demo-preview {
+    padding: 24px 16px;
+  }
+
+  /* Grids to 1 column */
+  .steps-grid,
+  .use-cases-grid,
+  .features-grid,
+  .rewards-grid,
+  .story-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .section-header {
+    margin-bottom: 32px;
+  }
+
+  .section-title {
+    font-size: clamp(22px, 6vw, 30px);
+    letter-spacing: -0.5px;
+  }
+
+  .section-subtitle {
+    font-size: 14.5px;
+  }
+
+  .story-card {
+    padding: 28px 18px;
+    border-radius: 20px;
+  }
+
+  .story-title {
+    font-size: clamp(22px, 6vw, 28px);
+  }
+
+  .story-lead {
+    font-size: 15px;
+    padding-left: 14px;
+    margin-bottom: 24px;
+  }
+
+  /* Comparison Table Mobile Scroll */
+  .comparison-table-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    margin: 0 -8px;
+    border-radius: 14px;
+  }
+
+  .comparison-table {
+    min-width: 600px;
+  }
+
+  .comparison-table th,
+  .comparison-table td {
+    padding: 12px 14px;
+    font-size: 13px;
+  }
+
+  /* FAQ Mobile */
+  .faq-item {
+    padding: 16px;
+  }
+
+  .faq-question {
+    font-size: 15px;
+  }
+
+  /* VIP Ticket Modal Mobile */
+  .modal {
+    padding: 12px;
+  }
+
+  .modal-card {
+    padding: 24px 18px;
+    max-height: 92vh;
+    overflow-y: auto;
+  }
+
+  .ticket-queue-number {
+    font-size: 38px;
+  }
+
+  .ticket-body {
+    padding: 16px 12px;
+  }
+
+  .referral-input-wrapper {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .btn-copy {
+    width: 100%;
+    padding: 10px;
+  }
+
+  /* Footer Mobile */
+  .footer {
+    padding: 30px 0;
   }
 
   .footer-content {
     flex-direction: column;
-    gap: 16px;
+    gap: 14px;
     text-align: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .hero-title {
+    font-size: 25px;
+  }
+
+  .brand-name {
+    font-size: 17px;
+  }
+
+  .btn-sm {
+    padding: 7px 14px;
+    font-size: 12px;
+  }
+
+  .role-pill {
+    font-size: 11px;
+    padding: 8px 4px;
+  }
+
+  .feature-card,
+  .use-case-card,
+  .step-card,
+  .reward-card,
+  .story-pillar {
+    padding: 20px 16px;
   }
 }
