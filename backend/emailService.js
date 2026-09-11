@@ -32,7 +32,8 @@ if (SMTP_HOST && SMTP_USER && SMTP_PASS) {
  * Generate responsive dark-mode VIP pass HTML email template
  */
 export function generateWelcomeEmailHtml({ email, queueNumber, referralCode, role = 'Host' }) {
-  const shareUrl = `http://localhost:4000/landing/?ref=${referralCode}`;
+  const baseUrl = process.env.BASE_URL || 'https://budcast.onrender.com';
+  const shareUrl = `${baseUrl}/?ref=${referralCode}`;
   const vipPassCode = `VIP-BC-${queueNumber}-${referralCode.slice(0, 4).toUpperCase()}`;
 
   return `
