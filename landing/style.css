@@ -27,9 +27,6 @@
 
 html {
   scroll-behavior: smooth;
-  width: 100%;
-  max-width: 100%;
-  overflow-x: hidden;
 }
 
 body {
@@ -37,16 +34,10 @@ body {
   color: var(--text-white);
   font-family: var(--font-family);
   width: 100%;
-  max-width: 100%;
   overflow-x: hidden;
   line-height: 1.6;
   position: relative;
-}
-
-main, section {
-  width: 100%;
-  max-width: 100%;
-  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* Ambient Background Glows */
@@ -1556,7 +1547,7 @@ main, section {
     border: 1px solid var(--border-subtle);
     background: #0B1120;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
-    touch-action: pan-x;
+    overscroll-behavior-x: contain;
   }
 
   .comparison-table {
