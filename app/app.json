@@ -45,7 +45,8 @@
         {
           "backgroundColor": "#050814",
           "image": "./assets/images/splash-icon.png",
-          "imageWidth": 120
+          "imageWidth": 140,
+          "resizeMode": "contain"
         }
       ],
       "expo-image"
@@ -55,10 +56,7 @@
       "reactCompiler": true
     },
     "extra": {
-      "router": {},
-      "eas": {
-        "projectId": "3ca649a6-3fb2-4b8d-961f-af473b93590d"
-      }
+      "router": {}
     },
     "owner": "akvish"
   }
