@@ -52,11 +52,13 @@
       "expo-image"
     ],
     "experiments": {
-      "typedRoutes": true,
-      "reactCompiler": true
+      "typedRoutes": true
     },
     "extra": {
-      "router": {}
+      "router": {},
+      "eas": {
+        "projectId": "1e3d1c42-ce98-46e5-80e9-c5dffd56df90"
+      }
     },
     "owner": "akvish"
   }
