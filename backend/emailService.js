@@ -1,5 +1,8 @@
 import { Resend } from 'resend';
 import nodemailer from 'nodemailer';
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 // Configuration from environment variables
 const RESEND_API_KEY = process.env.RESEND_API_KEY || '';
