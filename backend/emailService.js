@@ -242,52 +242,26 @@ export async function sendWelcomeEmail({ email, queueNumber, referralCode, role 
   const subject = `🎧 You're In! Your Budcast VIP Queue Pass (#${queueNumber})`;
   const html = generateWelcomeEmailHtml({ email, queueNumber, referralCode, role });
 
-  // 1. Resend Provider
-  if (resendClient) {
-    try {
-      const response = await resendClient.emails.send({
-        from: FROM_EMAIL,
-        to: email,
-        subject,
-        html,
-      });
-      console.log(`[Resend] Welcome email dispatched to ${email}:`, response);
-      return { success: true, provider: 'resend', response };
-    } catch (err) {
-      console.error('[Resend Error]:', err.message);
-    }
-  }
+  // 1. Custom SMTP / Gmail App Password Provider (Prioritized - sends to ANY email)
+  const smtpHost = process.env.SMTP_HOST;
+  const smtpUser = process.env.SMTP_USER;
+  const smtpPass = process.env.SMTP_PASS;
+  const smtpPort = parseInt(process.env.SMTP_PORT || '587', 10);
+  const fromEmail = process.env.FROM_EMAIL || 'Budcast VIP <akvish052@gmail.com>';
 
-  // 2. Brevo Provider
-  if (BREVO_API_KEY) {
+  if (smtpHost && smtpUser && smtpPass) {
     try {
-      const response = await fetch('https://api.brevo.com/v3/smtp/email', {
-        method: 'POST',
-        headers: {
-          'accept': 'application/json',
-          'api-key': BREVO_API_KEY,
-          'content-type': 'application/json'
-        },
-        body: JSON.stringify({
-          sender: { name: 'Budcast', email: FROM_EMAIL.replace(/.*<(.+)>/, '$1') || 'welcome@budcast.live' },
-          to: [{ email }],
-          subject,
-          htmlContent: html
-        })
+      const transporter = nodemailer.createTransport({
+        host: smtpHost,
+        port: smtpPort,
+        secure: smtpPort === 465,
+        auth: {
+          user: smtpUser,
+          pass: smtpPass
+        }
       });
-      const data = await response.json();
-      console.log(`[Brevo] Welcome email dispatched to ${email}:`, data);
-      return { success: true, provider: 'brevo', response: data };
-    } catch (err) {
-      console.error('[Brevo Error]:', err.message);
-    }
-  }
-
-  // 3. Custom SMTP / Nodemailer Provider
-  if (smtpTransporter) {
-    try {
-      const info = await smtpTransporter.sendMail({
-        from: FROM_EMAIL,
+      const info = await transporter.sendMail({
+        from: fromEmail,
         to: email,
         subject,
         html,
@@ -296,6 +270,24 @@ export async function sendWelcomeEmail({ email, queueNumber, referralCode, role 
       return { success: true, provider: 'smtp', messageId: info.messageId };
     } catch (err) {
       console.error('[SMTP Error]:', err.message);
+    }
+  }
+
+  // 2. Resend Provider
+  const resendKey = process.env.RESEND_API_KEY;
+  if (resendKey) {
+    try {
+      const client = new Resend(resendKey);
+      const response = await client.emails.send({
+        from: fromEmail,
+        to: email,
+        subject,
+        html,
+      });
+      console.log(`[Resend] Welcome email dispatched to ${email}:`, response);
+      return { success: true, provider: 'resend', response };
+    } catch (err) {
+      console.error('[Resend Error]:', err.message);
     }
   }
 
