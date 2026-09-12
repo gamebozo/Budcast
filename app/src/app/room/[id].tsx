@@ -156,7 +156,7 @@ export default function GuestRoomScreen() {
 
   if (error) {
     return (
-      <SafeAreaView style={styles.safeArea}>
+      <View style={styles.safeArea}>
         <View style={styles.errorContainer}>
           <AlertTriangle size={48} color="#EF4444" />
           <Text style={styles.errorTitle}>Connection Failed</Text>
