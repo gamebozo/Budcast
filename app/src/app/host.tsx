@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView,
+  View, Text, StyleSheet, TouchableOpacity, ScrollView,
   ActivityIndicator, Platform, TextInput
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -8,11 +8,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as DocumentPicker from 'expo-document-picker';
 import { getSocket } from '../services/socket';
 import { getHostId, saveHostedRoomId } from '../services/hostStorage';
-import { getApiBaseUrl } from '../services/apiConfig';
 import { MediaItem, MediaMode, RoomData, ListenerInfo } from '../types/sync';
 import { SyncedPlayer } from '../components/SyncedPlayer';
 import { ShareRoomModal } from '../components/ShareRoomModal';
 import { BudcastLogo } from '../components/BudcastLogo';
+import { getApiBaseUrl } from '../services/apiConfig';
 import {
   Users, ArrowLeft, Radio, Film, QrCode, Sliders, Mic, MicOff,
   Sparkles, Smartphone, Check, ChevronRight, Activity, Copy,
@@ -67,52 +67,27 @@ export default function HostScreen() {
 
         if (!result.canceled && result.assets && result.assets[0]) {
           const asset = result.assets[0];
-          setUploading(true);
+          const isVideo = asset.mimeType?.startsWith('video') || 
+                          asset.name.toLowerCase().endsWith('.mp4') || 
+                          asset.name.toLowerCase().endsWith('.mkv') || 
+                          asset.name.toLowerCase().endsWith('.mov') ||
+                          mode === 'video';
 
-          // Instantly set local media so playback and room hosting start immediately
-          const localItem: MediaItem = {
-            id: 'local-' + Date.now(),
+          const localMedia: MediaItem = {
+            id: 'device-' + Date.now(),
             title: asset.name.replace(/\.[^/.]+$/, ''),
-            type: mode === 'video' ? 'video' : 'audio',
+            type: isVideo ? 'video' : 'audio',
             url: asset.uri,
             filename: asset.name,
-            size: asset.size
+            size: asset.size || 0
           };
-          setSelectedMedia(localItem);
-          setRoomTitle(localItem.title);
 
-          // Background upload attempt to cloud backend if available
-          try {
-            const formData = new FormData();
-            formData.append('media', {
-              uri: asset.uri,
-              name: asset.name,
-              type: asset.mimeType || (mode === 'video' ? 'video/mp4' : 'audio/mp3')
-            } as any);
-            formData.append('title', asset.name.replace(/\.[^/.]+$/, ''));
-
-            const backendUrl = `${getApiBaseUrl()}/api/upload`;
-            const response = await fetch(backendUrl, {
-              method: 'POST',
-              body: formData,
-              headers: {
-                'Content-Type': 'multipart/form-data',
-              }
-            });
-
-            const data = await response.json();
-            if (data && data.url) {
-              setSelectedMedia(data);
-            }
-          } catch (uploadErr) {
-            console.log('Background upload skipped, local playback active');
-          }
+          setSelectedMedia(localMedia);
+          setRoomTitle(localMedia.title);
         }
       } catch (err: any) {
         console.error('File pick error:', err);
-        setUploadError('Could not open device files.');
-      } finally {
-        setUploading(false);
+        setUploadError('Could not open file. Please try again.');
       }
     }
   };
@@ -129,7 +104,8 @@ export default function HostScreen() {
     formData.append('title', file.name.replace(/\.[^/.]+$/, ''));
 
     try {
-      const backendUrl = `${getApiBaseUrl()}/api/upload`;
+      const baseUrl = getApiBaseUrl();
+      const backendUrl = `${baseUrl}/api/upload`;
       const response = await fetch(backendUrl, {
         method: 'POST',
         body: formData
@@ -218,16 +194,17 @@ export default function HostScreen() {
 
     const createRoom = () => {
       const hostId = getHostId();
+      const baseUrl = getApiBaseUrl();
       socket.emit('create_room', {
         mode,
         media: mediaToBroadcast,
-        title: roomTitle.trim() || (mode === 'video' ? 'Auvi Cinema' : 'Auvi Silent Party'),
+        title: roomTitle.trim() || (mode === 'video' ? 'Budcast Cinema Room' : 'Budcast Silent Party'),
         hostId
       }, (response: any) => {
         if (response && response.success) {
           saveHostedRoomId(response.roomId);
           setRoomData(response.room);
-          setRoomUrl(response.roomUrl || `http://localhost:8083/room/${response.roomId}`);
+          setRoomUrl(response.roomUrl || `${baseUrl}/room/${response.roomId}`);
           setIsSetupStage(false);
           setLoading(false);
         } else {
@@ -296,13 +273,13 @@ export default function HostScreen() {
   // ==========================================
   if (isSetupStage) {
     return (
-      <SafeAreaView style={styles.safeArea}>
+      <View style={styles.safeArea}>
         <ScrollView
           contentContainerStyle={[
             styles.container,
             {
-              paddingTop: Math.max(insets.top, Platform.OS === 'android' ? 16 : 8),
-              paddingBottom: insets.bottom + 40,
+              paddingTop: Math.max(insets.top + 8, 36),
+              paddingBottom: Math.max(insets.bottom + 60, 80)
             }
           ]}
           showsVerticalScrollIndicator={false}
@@ -561,7 +538,7 @@ export default function HostScreen() {
 
           <View style={{ height: 60 }} />
         </ScrollView>
-      </SafeAreaView>
+      </View>
     );
   }
 
@@ -579,13 +556,13 @@ export default function HostScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <View style={styles.safeArea}>
       <ScrollView
         contentContainerStyle={[
           styles.container,
           {
-            paddingTop: Math.max(insets.top, Platform.OS === 'android' ? 16 : 8),
-            paddingBottom: insets.bottom + 40,
+            paddingTop: Math.max(insets.top + 8, 36),
+            paddingBottom: Math.max(insets.bottom + 60, 80)
           }
         ]}
         showsVerticalScrollIndicator={false}
@@ -769,7 +746,7 @@ export default function HostScreen() {
         roomId={roomData.id}
         roomUrl={roomUrl}
       />
-    </SafeAreaView>
+    </View>
   );
 }
 

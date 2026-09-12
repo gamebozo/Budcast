@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  SafeAreaView, ActivityIndicator, RefreshControl, Platform
+  ActivityIndicator, RefreshControl, Platform
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -109,10 +109,9 @@ export default function ActivityHistoryScreen() {
   };
 
   const formatDate = (dateString: string) => {
-    if (!dateString) return 'Recent';
     try {
-      const d = new Date(dateString);
-      return d.toLocaleDateString(undefined, {
+      const date = new Date(dateString);
+      return date.toLocaleDateString([], {
         month: 'short',
         day: 'numeric',
         hour: '2-digit',
@@ -124,9 +123,15 @@ export default function ActivityHistoryScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <View style={styles.safeArea}>
       <ScrollView
-        contentContainerStyle={styles.container}
+        contentContainerStyle={[
+          styles.container,
+          {
+            paddingTop: Math.max(insets.top + 8, 36),
+            paddingBottom: Math.max(insets.bottom + 80, 100)
+          }
+        ]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#38BDF8" />
@@ -332,7 +337,7 @@ export default function ActivityHistoryScreen() {
 
       {/* Persistent Bottom Bar */}
       <FloatingNavBar />
-    </SafeAreaView>
+    </View>
   );
 }
 

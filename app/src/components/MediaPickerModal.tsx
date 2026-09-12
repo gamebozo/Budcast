@@ -36,48 +36,26 @@ export const MediaPickerModal: React.FC<Props> = ({
 
         if (!result.canceled && result.assets && result.assets[0]) {
           const asset = result.assets[0];
-          const isVideo = asset.mimeType?.startsWith('video');
+          const isVideo = asset.mimeType?.startsWith('video') || 
+                          asset.name.toLowerCase().endsWith('.mp4') || 
+                          asset.name.toLowerCase().endsWith('.mkv') || 
+                          asset.name.toLowerCase().endsWith('.mov') ||
+                          asset.name.toLowerCase().endsWith('.webm');
 
-          // Instantly prepare media item
-          const localItem: MediaItem = {
-            id: 'local-' + Date.now(),
+          const localMediaItem: MediaItem = {
+            id: 'device-' + Date.now(),
             title: asset.name.replace(/\.[^/.]+$/, ''),
             type: isVideo ? 'video' : 'audio',
             url: asset.uri,
             filename: asset.name,
-            size: asset.size
+            size: asset.size || 0
           };
 
-          setUploading(true);
-          try {
-            const formData = new FormData();
-            formData.append('media', {
-              uri: asset.uri,
-              name: asset.name,
-              type: asset.mimeType || (isVideo ? 'video/mp4' : 'audio/mp3')
-            } as any);
-            formData.append('title', asset.name.replace(/\.[^/.]+$/, ''));
-
-            const response = await fetch(`${getApiBaseUrl()}/api/upload`, {
-              method: 'POST',
-              body: formData,
-              headers: { 'Content-Type': 'multipart/form-data' }
-            });
-            const data = await response.json();
-            if (data && data.url) {
-              onSelect(data);
-            } else {
-              onSelect(localItem);
-            }
-          } catch (uploadErr) {
-            onSelect(localItem);
-          }
+          onSelect(localMediaItem);
           onClose();
         }
       } catch (e) {
-        console.error('Upload error:', e);
-      } finally {
-        setUploading(false);
+        console.error('File pick error:', e);
       }
     }
   };
@@ -92,7 +70,8 @@ export const MediaPickerModal: React.FC<Props> = ({
     formData.append('title', file.name.replace(/\.[^/.]+$/, ''));
 
     try {
-      const response = await fetch(`${getApiBaseUrl()}/api/upload`, {
+      const baseUrl = getApiBaseUrl();
+      const response = await fetch(`${baseUrl}/api/upload`, {
         method: 'POST',
         body: formData
       });

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Modal, TextInput, Platform, SafeAreaView, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Modal, TextInput, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
-import { X, Camera, QrCode, Upload, AlertCircle, CheckCircle2, RefreshCw } from 'lucide-react-native';
+import { X, Camera, QrCode, Upload, AlertCircle, CheckCircle2, ShieldCheck } from 'lucide-react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import jsQR from 'jsqr';
 import { BudcastLogo } from './BudcastLogo';
@@ -19,8 +19,11 @@ export function QRScannerModal({ visible, onClose, onScannedPin }: QRScannerModa
   const [error, setError] = useState('');
   const [cameraActive, setCameraActive] = useState(false);
   const [scanSuccess, setScanSuccess] = useState(false);
+
+  // Native permissions
   const [permission, requestPermission] = useCameraPermissions();
 
+  // Web camera refs
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -42,6 +45,7 @@ export function QRScannerModal({ visible, onClose, onScannedPin }: QRScannerModa
   };
 
   const handleScannedData = (decodedText: string) => {
+    if (scanSuccess) return;
     console.log('[QR Modal] Found QR Code:', decodedText);
     stopCamera();
     setScanSuccess(true);
@@ -60,6 +64,7 @@ export function QRScannerModal({ visible, onClose, onScannedPin }: QRScannerModa
     if (extractedPin) {
       setTimeout(() => {
         onClose();
+        setScanSuccess(false);
         if (onScannedPin) {
           onScannedPin(extractedPin);
         } else {
@@ -98,7 +103,7 @@ export function QRScannerModal({ visible, onClose, onScannedPin }: QRScannerModa
     animationFrameId.current = requestAnimationFrame(scanFrame);
   };
 
-  const startCamera = async () => {
+  const startWebCamera = async () => {
     if (Platform.OS !== 'web' || typeof navigator === 'undefined' || !navigator.mediaDevices) return;
     setError('');
     setScanSuccess(false);
@@ -124,17 +129,23 @@ export function QRScannerModal({ visible, onClose, onScannedPin }: QRScannerModa
 
   useEffect(() => {
     if (visible && activeTab === 'camera') {
-      startCamera();
+      if (Platform.OS === 'web') {
+        startWebCamera();
+      } else {
+        if (!permission?.granted) {
+          requestPermission();
+        }
+      }
     } else {
       stopCamera();
     }
     return () => {
       stopCamera();
     };
-  }, [visible, activeTab]);
+  }, [visible, activeTab, permission?.granted]);
 
   useEffect(() => {
-    if (cameraActive) {
+    if (cameraActive && Platform.OS === 'web') {
       animationFrameId.current = requestAnimationFrame(scanFrame);
     }
     return () => {
@@ -299,77 +310,40 @@ export function QRScannerModal({ visible, onClose, onScannedPin }: QRScannerModa
                     )}
                   </div>
                 ) : (
-                  <View style={{ width: 260, height: 260, position: 'relative', backgroundColor: '#000', borderRadius: 16, overflow: 'hidden' }}>
-                    {!permission ? (
-                      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-                        <ActivityIndicator color="#38BDF8" size="large" />
-                      </View>
-                    ) : !permission.granted ? (
-                      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 16 }}>
-                        <Camera size={32} color="#38BDF8" style={{ marginBottom: 12 }} />
-                        <Text style={{ color: '#F8FAFC', fontSize: 13, fontWeight: '700', textAlign: 'center', marginBottom: 6 }}>
-                          Camera Access Needed
+                  <View style={styles.nativeCameraContainer}>
+                    {!permission?.granted ? (
+                      <View style={styles.permissionBox}>
+                        <Camera size={36} color="#38BDF8" />
+                        <Text style={styles.permissionTitle}>Camera Access Required</Text>
+                        <Text style={styles.permissionSub}>
+                          Budcast needs camera access to scan and connect to the host's QR code.
                         </Text>
-                        <Text style={{ color: '#94A3B8', fontSize: 11, textAlign: 'center', marginBottom: 14 }}>
-                          Allow camera access to instantly scan host QR codes
-                        </Text>
-                        <TouchableOpacity
-                          style={{ backgroundColor: '#38BDF8', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10 }}
-                          onPress={requestPermission}
-                        >
-                          <Text style={{ color: '#050814', fontSize: 12, fontWeight: '800' }}>Grant Permission</Text>
+                        <TouchableOpacity style={styles.grantBtn} onPress={requestPermission}>
+                          <ShieldCheck size={16} color="#090A0F" />
+                          <Text style={styles.grantBtnText}>Allow Camera Access</Text>
                         </TouchableOpacity>
                       </View>
                     ) : (
-                      <>
-                        <CameraView
-                          style={{ width: 260, height: 260 }}
-                          facing="back"
-                          barcodeScannerSettings={{
-                            barcodeTypes: ['qr'],
-                          }}
-                          onBarcodeScanned={({ data }) => {
-                            if (!scanSuccess && data) {
-                              handleScannedData(data);
-                            }
-                          }}
-                        />
-                        {/* Viewfinder Target Border Overlay */}
-                        <View
-                          pointerEvents="none"
-                          style={{
-                            position: 'absolute',
-                            top: 24,
-                            left: 24,
-                            right: 24,
-                            bottom: 24,
-                            borderWidth: 2,
-                            borderColor: '#38BDF8',
-                            borderRadius: 14,
-                            borderStyle: 'dashed',
-                          }}
-                        />
-                        {scanSuccess && (
-                          <View
-                            style={{
-                              position: 'absolute',
-                              top: 0,
-                              left: 0,
-                              right: 0,
-                              bottom: 0,
-                              backgroundColor: 'rgba(5, 8, 20, 0.92)',
-                              justifyContent: 'center',
-                              alignItems: 'center',
-                              gap: 10,
-                            }}
-                          >
-                            <CheckCircle2 size={44} color="#10B981" />
-                            <Text style={{ fontSize: 14, fontWeight: '800', color: '#10B981' }}>
-                              QR Verified! Connecting...
-                            </Text>
-                          </View>
-                        )}
-                      </>
+                      <CameraView
+                        style={styles.nativeCameraView}
+                        facing="back"
+                        barcodeScannerSettings={{
+                          barcodeTypes: ['qr'],
+                        }}
+                        onBarcodeScanned={({ data }) => {
+                          if (data) {
+                            handleScannedData(data);
+                          }
+                        }}
+                      >
+                        <View style={styles.reticleFrame}>
+                          <View style={styles.reticleCornerTL} />
+                          <View style={styles.reticleCornerTR} />
+                          <View style={styles.reticleCornerBL} />
+                          <View style={styles.reticleCornerBR} />
+                          <View style={styles.laserLine} />
+                        </View>
+                      </CameraView>
                     )}
                   </View>
                 )}
@@ -417,6 +391,8 @@ export function QRScannerModal({ visible, onClose, onScannedPin }: QRScannerModa
                 maxLength={4}
                 value={pin}
                 autoFocus
+                includeFontPadding={false}
+                textAlignVertical="center"
                 onChangeText={(val) => {
                   setPin(val);
                   if (error) setError('');
@@ -522,6 +498,120 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderWidth: 2,
     borderColor: '#1E293B',
+    width: 260,
+    height: 260,
+    backgroundColor: '#000000',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  nativeCameraContainer: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  nativeCameraView: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  permissionBox: {
+    padding: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  permissionTitle: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '800',
+    marginTop: 10,
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  permissionSub: {
+    color: '#94A3B8',
+    fontSize: 11,
+    textAlign: 'center',
+    marginBottom: 14,
+    lineHeight: 16,
+  },
+  grantBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#38BDF8',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  grantBtnText: {
+    color: '#090A0F',
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  reticleFrame: {
+    width: 180,
+    height: 180,
+    borderWidth: 1.5,
+    borderColor: 'rgba(56, 189, 248, 0.4)',
+    borderRadius: 16,
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  reticleCornerTL: {
+    position: 'absolute',
+    top: -2,
+    left: -2,
+    width: 20,
+    height: 20,
+    borderTopWidth: 3,
+    borderLeftWidth: 3,
+    borderColor: '#38BDF8',
+    borderTopLeftRadius: 12,
+  },
+  reticleCornerTR: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    width: 20,
+    height: 20,
+    borderTopWidth: 3,
+    borderRightWidth: 3,
+    borderColor: '#38BDF8',
+    borderTopRightRadius: 12,
+  },
+  reticleCornerBL: {
+    position: 'absolute',
+    bottom: -2,
+    left: -2,
+    width: 20,
+    height: 20,
+    borderBottomWidth: 3,
+    borderLeftWidth: 3,
+    borderColor: '#38BDF8',
+    borderBottomLeftRadius: 12,
+  },
+  reticleCornerBR: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    width: 20,
+    height: 20,
+    borderBottomWidth: 3,
+    borderRightWidth: 3,
+    borderColor: '#38BDF8',
+    borderBottomRightRadius: 12,
+  },
+  laserLine: {
+    width: '90%',
+    height: 2,
+    backgroundColor: '#38BDF8',
+    shadowColor: '#38BDF8',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.9,
+    shadowRadius: 8,
   },
   scannerHint: {
     fontSize: 12,
@@ -555,6 +645,7 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: '800',
     textAlign: 'center',
+    textAlignVertical: 'center',
     letterSpacing: 10,
     marginBottom: 16,
   },

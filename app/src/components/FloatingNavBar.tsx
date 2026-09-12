@@ -17,6 +17,7 @@ export const FloatingNavBar: React.FC = () => {
   const router = useRouter();
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
+  const dynamicBottom = Math.max(insets.bottom + 10, 16);
 
   const navItems: NavItem[] = [
     {
@@ -49,10 +50,8 @@ export const FloatingNavBar: React.FC = () => {
     },
   ];
 
-  const bottomInset = Math.max(insets.bottom, 12);
-
   return (
-    <View style={[styles.container, { bottom: bottomInset + 8 }]} pointerEvents="box-none">
+    <View style={[styles.container, { bottom: dynamicBottom }]} pointerEvents="box-none">
       <View style={styles.navBar}>
         {navItems.map((item) => {
           const isActive = pathname === item.route;

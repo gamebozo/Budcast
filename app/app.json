@@ -17,15 +17,6 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "androidStatusBar": {
-        "barStyle": "light-content",
-        "backgroundColor": "#050814",
-        "translucent": false
-      },
-      "androidNavigationBar": {
-        "barStyle": "light-content",
-        "backgroundColor": "#050814"
-      },
       "predictiveBackGestureEnabled": false,
       "package": "com.budcast.live",
       "permissions": [
@@ -42,6 +33,15 @@
         "FOREGROUND_SERVICE_MEDIA_PLAYBACK"
       ]
     },
+    "androidStatusBar": {
+      "barStyle": "light-content",
+      "backgroundColor": "#050814",
+      "translucent": true
+    },
+    "androidNavigationBar": {
+      "barStyle": "light-content",
+      "backgroundColor": "#050814"
+    },
     "web": {
       "bundler": "metro",
       "output": "static",
@@ -54,7 +54,7 @@
         {
           "backgroundColor": "#050814",
           "image": "./assets/images/splash-icon.png",
-          "imageWidth": 200,
+          "imageWidth": 220,
           "resizeMode": "contain"
         }
       ],

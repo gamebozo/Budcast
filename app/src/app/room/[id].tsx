@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ActivityIndicator, Platform, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Platform, ScrollView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getSocket } from '../../services/socket';
@@ -169,12 +169,12 @@ export default function GuestRoomScreen() {
             <Text style={styles.errorBtnText}>Return to Home</Text>
           </TouchableOpacity>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={[styles.safeArea, isGlowMode && { backgroundColor: currentChannelColor }]}>
+    <View style={styles.safeArea}>
       {/* Fullscreen Glow Screen Mode Overlay if active */}
       {isGlowMode ? (
         <TouchableOpacity
@@ -196,8 +196,8 @@ export default function GuestRoomScreen() {
           contentContainerStyle={[
             styles.container,
             {
-              paddingTop: Math.max(insets.top, Platform.OS === 'android' ? 16 : 8),
-              paddingBottom: insets.bottom + 40,
+              paddingTop: Math.max(insets.top + 8, 36),
+              paddingBottom: Math.max(insets.bottom + 40, 60)
             }
           ]}
           showsVerticalScrollIndicator={false}
@@ -349,7 +349,7 @@ export default function GuestRoomScreen() {
 
       {/* Floating Reaction Animation Overlay */}
       <ReactionOverlay reactions={reactions} />
-    </SafeAreaView>
+    </View>
   );
 }
 

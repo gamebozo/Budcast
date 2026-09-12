@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TextInput, TouchableOpacity,
-  ScrollView, SafeAreaView, Platform, ActivityIndicator, Alert, Linking
+  ScrollView, Platform, ActivityIndicator, Alert, Linking
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -122,8 +122,17 @@ export default function VipRedemptionScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+    <View style={styles.safeArea}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.scrollContent,
+          {
+            paddingTop: Math.max(insets.top + 8, 36),
+            paddingBottom: Math.max(insets.bottom + 80, 100)
+          }
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
         
         {/* Top Header */}
         <View style={styles.header}>
@@ -275,10 +284,7 @@ export default function VipRedemptionScreen() {
               <TouchableOpacity
                 style={styles.waitlistBtn}
                 onPress={() => {
-                  const url = getApiBaseUrl() + '/';
-                  Linking.openURL(url).catch(() => {
-                    Alert.alert('Budcast Pre-Launch', `Visit ${url} to claim your VIP Pass.`);
-                  });
+                  Linking.openURL('https://budcast.onrender.com');
                 }}
               >
                 <Text style={styles.waitlistBtnText}>Claim VIP Early Pass Online</Text>
@@ -292,7 +298,7 @@ export default function VipRedemptionScreen() {
       </ScrollView>
 
       <FloatingNavBar />
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -303,7 +309,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: 20,
-    paddingTop: 16,
+    paddingTop: Platform.OS === 'android' ? 40 : 16,
     paddingBottom: 40,
     alignItems: 'center',
   },

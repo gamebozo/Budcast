@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  SafeAreaView, Platform, ActivityIndicator
+  Platform, ActivityIndicator
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -153,13 +153,13 @@ export default function ProScreen() {
   ];
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <View style={styles.safeArea}>
       <ScrollView
         contentContainerStyle={[
           styles.container,
           {
-            paddingTop: Math.max(insets.top, Platform.OS === 'android' ? 16 : 8),
-            paddingBottom: insets.bottom + 90,
+            paddingTop: Math.max(insets.top + 8, 36),
+            paddingBottom: Math.max(insets.bottom + 80, 100)
           }
         ]}
         showsVerticalScrollIndicator={false}
@@ -384,7 +384,7 @@ export default function ProScreen() {
 
       {/* Floating Bottom Nav */}
       <FloatingNavBar />
-    </SafeAreaView>
+    </View>
   );
 }
 

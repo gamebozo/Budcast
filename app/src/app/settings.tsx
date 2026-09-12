@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView, Switch, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Switch, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -60,22 +60,22 @@ export default function SettingsScreen() {
         console.log('Audio test error:', e);
       }
     }
-    setTimeout(() => setIsPlayingTestTone(false), 600);
+    setTimeout(() => setIsPlayingTestTone(false), 300);
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <View style={styles.safeArea}>
       <ScrollView
         contentContainerStyle={[
           styles.container,
           {
-            paddingTop: Math.max(insets.top, Platform.OS === 'android' ? 16 : 8),
-            paddingBottom: insets.bottom + 90,
+            paddingTop: Math.max(insets.top + 8, 36),
+            paddingBottom: Math.max(insets.bottom + 80, 100)
           }
         ]}
         showsVerticalScrollIndicator={false}
-      >
-        {/* Top Header */}
+        bounces={false}
+      >{/* Top Header */}
         <View style={styles.topBar}>
           <TouchableOpacity style={styles.backBtn} onPress={() => router.push('/' as any)}>
             <ArrowLeft size={18} color="#94A3B8" />
@@ -258,7 +258,7 @@ export default function SettingsScreen() {
 
       {/* Floating Bottom Nav */}
       <FloatingNavBar />
-    </SafeAreaView>
+    </View>
   );
 }
 

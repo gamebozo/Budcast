@@ -8,11 +8,11 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <ThemeProvider value={DarkTheme}>
-        <StatusBar style="light" backgroundColor="#050814" translucent={false} />
+        <StatusBar style="light" translucent={true} backgroundColor="#050814" />
         <Stack
           screenOptions={{
             headerShown: false,
-            contentStyle: { backgroundColor: '#070B14' },
+            contentStyle: { backgroundColor: '#050814' },
             animation: 'fade',
           }}
         >

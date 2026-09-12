@@ -1,17 +1,22 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, SafeAreaView, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
-import { ArrowLeft, Camera, QrCode, Upload, AlertCircle, CheckCircle2, RefreshCw } from 'lucide-react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { CameraView, useCameraPermissions } from 'expo-camera';
+import { ArrowLeft, Camera, QrCode, Upload, AlertCircle, CheckCircle2, ShieldCheck } from 'lucide-react-native';
 import jsQR from 'jsqr';
 import { BudcastLogo } from '../components/BudcastLogo';
 
 export default function JoinScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState<'camera' | 'pin'>('camera');
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
   const [cameraActive, setCameraActive] = useState(false);
   const [scanSuccess, setScanSuccess] = useState(false);
+
+  const [permission, requestPermission] = useCameraPermissions();
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -20,6 +25,7 @@ export default function JoinScreen() {
 
   // Extract Room PIN from scanned QR code data
   const handleScannedData = (decodedText: string) => {
+    if (scanSuccess) return;
     console.log('[QR Scanner] Found QR Code:', decodedText);
     stopCamera();
     setScanSuccess(true);
@@ -74,9 +80,10 @@ export default function JoinScreen() {
   };
 
   // Start Camera Stream
-  const startCamera = async () => {
+  const startWebCamera = async () => {
     if (Platform.OS !== 'web' || typeof navigator === 'undefined' || !navigator.mediaDevices) return;
     setError('');
+    setScanSuccess(false);
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -115,7 +122,7 @@ export default function JoinScreen() {
 
   // Run scanning loop when camera becomes active
   useEffect(() => {
-    if (cameraActive) {
+    if (cameraActive && Platform.OS === 'web') {
       animationFrameId.current = requestAnimationFrame(scanFrame);
     }
     return () => {
@@ -128,14 +135,20 @@ export default function JoinScreen() {
   // Tab change trigger
   useEffect(() => {
     if (activeTab === 'camera') {
-      startCamera();
+      if (Platform.OS === 'web') {
+        startWebCamera();
+      } else {
+        if (!permission?.granted) {
+          requestPermission();
+        }
+      }
     } else {
       stopCamera();
     }
     return () => {
       stopCamera();
     };
-  }, [activeTab]);
+  }, [activeTab, permission?.granted]);
 
   // Decode QR code from uploaded photo
   const handleFileUpload = (e: any) => {
@@ -178,8 +191,16 @@ export default function JoinScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={styles.container}>
+    <View style={styles.safeArea}>
+      <View
+        style={[
+          styles.container,
+          {
+            paddingTop: Math.max(insets.top + 8, 36),
+            paddingBottom: Math.max(insets.bottom + 20, 30)
+          }
+        ]}
+      >
         {/* Top Header */}
         <View style={styles.topBar}>
           <TouchableOpacity style={styles.backBtn} onPress={() => {
@@ -278,7 +299,44 @@ export default function JoinScreen() {
                     </div>
                   )}
                 </div>
-              ) : null}
+              ) : (
+                <View style={styles.nativeCameraContainer}>
+                  {!permission?.granted ? (
+                    <View style={styles.permissionBox}>
+                      <Camera size={36} color="#38BDF8" />
+                      <Text style={styles.permissionTitle}>Camera Access Required</Text>
+                      <Text style={styles.permissionSub}>
+                        Budcast needs camera access to scan and connect to the host's QR code.
+                      </Text>
+                      <TouchableOpacity style={styles.grantBtn} onPress={requestPermission}>
+                        <ShieldCheck size={16} color="#090A0F" />
+                        <Text style={styles.grantBtnText}>Allow Camera Access</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <CameraView
+                      style={styles.nativeCameraView}
+                      facing="back"
+                      barcodeScannerSettings={{
+                        barcodeTypes: ['qr'],
+                      }}
+                      onBarcodeScanned={({ data }) => {
+                        if (data) {
+                          handleScannedData(data);
+                        }
+                      }}
+                    >
+                      <View style={styles.reticleFrame}>
+                        <View style={styles.reticleCornerTL} />
+                        <View style={styles.reticleCornerTR} />
+                        <View style={styles.reticleCornerBL} />
+                        <View style={styles.reticleCornerBR} />
+                        <View style={styles.laserLine} />
+                      </View>
+                    </CameraView>
+                  )}
+                </View>
+              )}
             </View>
 
             <Text style={styles.scannerHint}>
@@ -292,11 +350,11 @@ export default function JoinScreen() {
                   display: 'flex',
                   alignItems: 'center',
                   gap: '8px',
-                  backgroundColor: '#1A1D2A',
-                  padding: '10px 16px',
+                  backgroundColor: '#1E293B',
+                  padding: '10px 18px',
                   borderRadius: '12px',
-                  border: '1px solid #2A3044',
-                  color: '#CBD5E1',
+                  border: '1px solid #334155',
+                  color: '#94A3B8',
                   fontSize: '13px',
                   fontWeight: '600',
                   cursor: 'pointer'
@@ -325,6 +383,8 @@ export default function JoinScreen() {
               maxLength={4}
               value={pin}
               autoFocus
+              includeFontPadding={false}
+              textAlignVertical="center"
               onChangeText={(val) => {
                 setPin(val);
                 if (error) setError('');
@@ -349,7 +409,7 @@ export default function JoinScreen() {
           </View>
         ) : null}
       </View>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -436,6 +496,118 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: 280,
+  },
+  nativeCameraContainer: {
+    width: 260,
+    height: 260,
+    borderRadius: 16,
+    overflow: 'hidden',
+    backgroundColor: '#000',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  nativeCameraView: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  permissionBox: {
+    padding: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  permissionTitle: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '800',
+    marginTop: 10,
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  permissionSub: {
+    color: '#94A3B8',
+    fontSize: 11,
+    textAlign: 'center',
+    marginBottom: 14,
+    lineHeight: 16,
+  },
+  grantBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#38BDF8',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  grantBtnText: {
+    color: '#090A0F',
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  reticleFrame: {
+    width: 180,
+    height: 180,
+    borderWidth: 1.5,
+    borderColor: 'rgba(56, 189, 248, 0.4)',
+    borderRadius: 16,
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  reticleCornerTL: {
+    position: 'absolute',
+    top: -2,
+    left: -2,
+    width: 20,
+    height: 20,
+    borderTopWidth: 3,
+    borderLeftWidth: 3,
+    borderColor: '#38BDF8',
+    borderTopLeftRadius: 12,
+  },
+  reticleCornerTR: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    width: 20,
+    height: 20,
+    borderTopWidth: 3,
+    borderRightWidth: 3,
+    borderColor: '#38BDF8',
+    borderTopRightRadius: 12,
+  },
+  reticleCornerBL: {
+    position: 'absolute',
+    bottom: -2,
+    left: -2,
+    width: 20,
+    height: 20,
+    borderBottomWidth: 3,
+    borderLeftWidth: 3,
+    borderColor: '#38BDF8',
+    borderBottomLeftRadius: 12,
+  },
+  reticleCornerBR: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    width: 20,
+    height: 20,
+    borderBottomWidth: 3,
+    borderRightWidth: 3,
+    borderColor: '#38BDF8',
+    borderBottomRightRadius: 12,
+  },
+  laserLine: {
+    width: '90%',
+    height: 2,
+    backgroundColor: '#38BDF8',
+    shadowColor: '#38BDF8',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.9,
+    shadowRadius: 8,
   },
   scannerHint: {
     fontSize: 12,

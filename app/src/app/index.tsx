@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, SafeAreaView, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -61,14 +61,14 @@ export default function HomeScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <View style={styles.safeArea}>
       <ScrollView
         contentContainerStyle={[
           styles.container,
           {
-            paddingTop: Math.max(insets.top, Platform.OS === 'android' ? 16 : 8),
-            paddingBottom: insets.bottom + 90,
-          },
+            paddingTop: Math.max(insets.top + 8, 36),
+            paddingBottom: Math.max(insets.bottom + 90, 110)
+          }
         ]}
         showsVerticalScrollIndicator={false}
         bounces={false}
@@ -161,17 +161,12 @@ export default function HomeScreen() {
 
           <View style={styles.joinCard}>
             <TextInput
-              style={[
-                styles.pinInputFull,
-                { letterSpacing: pin.length > 0 ? 8 : 0, fontSize: pin.length > 0 ? 22 : 15 }
-              ]}
+              style={styles.pinInputFull}
               placeholder="Enter 4-Digit PIN"
               placeholderTextColor="#475569"
               keyboardType="number-pad"
               maxLength={4}
               value={pin}
-              cursorColor="#38BDF8"
-              selectionColor="rgba(56, 189, 248, 0.4)"
               onChangeText={(val) => {
                 setPin(val);
                 setError('');
@@ -417,7 +412,7 @@ export default function HomeScreen() {
           router.push(`/room/${scannedPin}` as any);
         }}
       />
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -428,7 +423,6 @@ const styles = StyleSheet.create({
   },
   container: {
     paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'android' ? 24 : 12,
   },
   topBar: {
     flexDirection: 'row',
@@ -578,13 +572,15 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 14,
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '800',
     color: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#334155',
     textAlign: 'center',
-    letterSpacing: 2,
+    textAlignVertical: 'center',
+    includeFontPadding: false,
+    letterSpacing: 4,
     marginBottom: 10,
   },
   joinBtnFull: {
