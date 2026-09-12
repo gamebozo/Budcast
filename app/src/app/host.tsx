@@ -4,9 +4,11 @@ import {
   ActivityIndicator, Platform, TextInput
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as DocumentPicker from 'expo-document-picker';
 import { getSocket } from '../services/socket';
 import { getHostId, saveHostedRoomId } from '../services/hostStorage';
+import { getApiBaseUrl } from '../services/apiConfig';
 import { MediaItem, MediaMode, RoomData, ListenerInfo } from '../types/sync';
 import { SyncedPlayer } from '../components/SyncedPlayer';
 import { ShareRoomModal } from '../components/ShareRoomModal';
@@ -20,6 +22,7 @@ import {
 
 export default function HostScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const params = useLocalSearchParams();
   const initialMode: MediaMode = (params.mode as MediaMode) || 'video';
 
@@ -66,32 +69,48 @@ export default function HostScreen() {
           const asset = result.assets[0];
           setUploading(true);
 
-          const formData = new FormData();
-          formData.append('media', {
-            uri: asset.uri,
-            name: asset.name,
-            type: asset.mimeType || (mode === 'video' ? 'video/mp4' : 'audio/mp3')
-          } as any);
-          formData.append('title', asset.name.replace(/\.[^/.]+$/, ''));
+          // Instantly set local media so playback and room hosting start immediately
+          const localItem: MediaItem = {
+            id: 'local-' + Date.now(),
+            title: asset.name.replace(/\.[^/.]+$/, ''),
+            type: mode === 'video' ? 'video' : 'audio',
+            url: asset.uri,
+            filename: asset.name,
+            size: asset.size
+          };
+          setSelectedMedia(localItem);
+          setRoomTitle(localItem.title);
 
-          const backendUrl = 'http://localhost:4000/api/upload';
-          const response = await fetch(backendUrl, {
-            method: 'POST',
-            body: formData,
-            headers: {
-              'Content-Type': 'multipart/form-data',
+          // Background upload attempt to cloud backend if available
+          try {
+            const formData = new FormData();
+            formData.append('media', {
+              uri: asset.uri,
+              name: asset.name,
+              type: asset.mimeType || (mode === 'video' ? 'video/mp4' : 'audio/mp3')
+            } as any);
+            formData.append('title', asset.name.replace(/\.[^/.]+$/, ''));
+
+            const backendUrl = `${getApiBaseUrl()}/api/upload`;
+            const response = await fetch(backendUrl, {
+              method: 'POST',
+              body: formData,
+              headers: {
+                'Content-Type': 'multipart/form-data',
+              }
+            });
+
+            const data = await response.json();
+            if (data && data.url) {
+              setSelectedMedia(data);
             }
-          });
-
-          const data = await response.json();
-          if (data && data.url) {
-            setSelectedMedia(data);
-            setRoomTitle(data.title);
+          } catch (uploadErr) {
+            console.log('Background upload skipped, local playback active');
           }
         }
       } catch (err: any) {
         console.error('File pick error:', err);
-        setUploadError('Could not upload file. Please try again.');
+        setUploadError('Could not open device files.');
       } finally {
         setUploading(false);
       }
@@ -110,7 +129,7 @@ export default function HostScreen() {
     formData.append('title', file.name.replace(/\.[^/.]+$/, ''));
 
     try {
-      const backendUrl = 'http://localhost:4000/api/upload';
+      const backendUrl = `${getApiBaseUrl()}/api/upload`;
       const response = await fetch(backendUrl, {
         method: 'POST',
         body: formData
@@ -279,7 +298,13 @@ export default function HostScreen() {
     return (
       <SafeAreaView style={styles.safeArea}>
         <ScrollView
-          contentContainerStyle={styles.container}
+          contentContainerStyle={[
+            styles.container,
+            {
+              paddingTop: Math.max(insets.top, Platform.OS === 'android' ? 16 : 8),
+              paddingBottom: insets.bottom + 40,
+            }
+          ]}
           showsVerticalScrollIndicator={false}
           bounces={false}
         >
@@ -547,7 +572,7 @@ export default function HostScreen() {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#38BDF8" />
-        <Text style={styles.loadingText}>Initializing Auvi Broadcast Studio...</Text>
+        <Text style={styles.loadingText}>Initializing Budcast Broadcast Studio...</Text>
         <Text style={styles.loadingSubText}>Connecting zero-latency audio sync</Text>
       </View>
     );
@@ -556,7 +581,13 @@ export default function HostScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView
-        contentContainerStyle={styles.container}
+        contentContainerStyle={[
+          styles.container,
+          {
+            paddingTop: Math.max(insets.top, Platform.OS === 'android' ? 16 : 8),
+            paddingBottom: insets.bottom + 40,
+          }
+        ]}
         showsVerticalScrollIndicator={false}
         bounces={false}
       >
@@ -568,7 +599,7 @@ export default function HostScreen() {
           </TouchableOpacity>
 
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <AuviLogo size={26} />
+            <BudcastLogo size={26} />
             <View style={styles.hostPill}>
               <View style={styles.pulseDot} />
               <Text style={styles.hostPillText}>LIVE HOST STUDIO</Text>

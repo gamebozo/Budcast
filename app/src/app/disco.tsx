@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   Radio, Headphones, Play, Sparkles, Volume2, Users, ArrowLeft,
   Zap, ChevronRight, Check, Mic, ShieldCheck, Flame, Crown
@@ -11,6 +12,7 @@ import { BudcastLogo } from '../components/BudcastLogo';
 
 export default function SilentDiscoScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [selectedChannel, setSelectedChannel] = useState<'red' | 'blue' | 'green'>('red');
   const [showProModal, setShowProModal] = useState(false);
 
@@ -48,7 +50,13 @@ export default function SilentDiscoScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView
-        contentContainerStyle={styles.container}
+        contentContainerStyle={[
+          styles.container,
+          {
+            paddingTop: Math.max(insets.top, Platform.OS === 'android' ? 16 : 8),
+            paddingBottom: insets.bottom + 90,
+          }
+        ]}
         showsVerticalScrollIndicator={false}
         bounces={false}
       >

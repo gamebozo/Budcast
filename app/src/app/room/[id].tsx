@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ActivityIndicator, Platform, ScrollView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getSocket } from '../../services/socket';
 import { MediaItem, MediaMode, PlaybackState, SyncEvent, ReactionItem } from '../../types/sync';
 import { SyncedPlayer } from '../../components/SyncedPlayer';
@@ -192,7 +193,13 @@ export default function GuestRoomScreen() {
         </TouchableOpacity>
       ) : (
         <ScrollView
-          contentContainerStyle={styles.container}
+          contentContainerStyle={[
+            styles.container,
+            {
+              paddingTop: Math.max(insets.top, Platform.OS === 'android' ? 16 : 8),
+              paddingBottom: insets.bottom + 40,
+            }
+          ]}
           showsVerticalScrollIndicator={false}
           bounces={false}
         >

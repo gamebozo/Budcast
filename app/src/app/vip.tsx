@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TextInput, TouchableOpacity,
-  ScrollView, SafeAreaView, Platform, ActivityIndicator, Alert
+  ScrollView, SafeAreaView, Platform, ActivityIndicator, Alert, Linking
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   Crown, Sparkles, CheckCircle2, ArrowLeft, ShieldCheck,
   Radio, Zap, Copy, Award, Users, KeyRound, ExternalLink
@@ -15,6 +16,7 @@ import { getApiBaseUrl } from '../services/apiConfig';
 
 export default function VipRedemptionScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [vipCode, setVipCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -273,12 +275,10 @@ export default function VipRedemptionScreen() {
               <TouchableOpacity
                 style={styles.waitlistBtn}
                 onPress={() => {
-                  if (Platform.OS === 'web') {
-                    const host = typeof window !== 'undefined' ? (window.location.hostname || 'localhost') : 'localhost';
-                    window.open(`http://${host}:4000/landing/`, '_blank');
-                  } else {
-                    Alert.alert('Join Waitlist', 'Visit http://localhost:4000/landing/ to secure your VIP Pass.');
-                  }
+                  const url = getApiBaseUrl() + '/';
+                  Linking.openURL(url).catch(() => {
+                    Alert.alert('Budcast Pre-Launch', `Visit ${url} to claim your VIP Pass.`);
+                  });
                 }}
               >
                 <Text style={styles.waitlistBtnText}>Claim VIP Early Pass Online</Text>
@@ -303,7 +303,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'android' ? 40 : 16,
+    paddingTop: 16,
     paddingBottom: 40,
     alignItems: 'center',
   },

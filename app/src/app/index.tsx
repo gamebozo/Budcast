@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, SafeAreaView, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   Film, Radio, QrCode, ArrowRight, Sparkles, Wifi, Users,
   Play, Crown, ChevronRight, Sliders, Smartphone, Check,
@@ -12,9 +13,11 @@ import { ProUpgradeModal } from '../components/ProUpgradeModal';
 import { QRScannerModal } from '../components/QRScannerModal';
 import { BudcastLogo } from '../components/BudcastLogo';
 import { getHostId, getActivePlan, isFounderUser } from '../services/hostStorage';
+import { getApiBaseUrl } from '../services/apiConfig';
 
 export default function HomeScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
   const [showProModal, setShowProModal] = useState(false);
@@ -27,8 +30,9 @@ export default function HomeScreen() {
   useEffect(() => {
     setActivePlanState(getActivePlan());
     const hostId = getHostId();
+    const baseUrl = getApiBaseUrl();
     // Fetch only this host's broadcasts from backend
-    fetch(`http://localhost:4000/api/history/rooms?hostId=${encodeURIComponent(hostId)}`)
+    fetch(`${baseUrl}/api/history/rooms?hostId=${encodeURIComponent(hostId)}`)
       .then(res => res.json())
       .then(data => {
         if (Array.isArray(data)) {
@@ -37,7 +41,7 @@ export default function HomeScreen() {
       })
       .catch(() => {});
 
-    fetch(`http://localhost:4000/api/history/listeners?hostId=${encodeURIComponent(hostId)}`)
+    fetch(`${baseUrl}/api/history/listeners?hostId=${encodeURIComponent(hostId)}`)
       .then(res => res.json())
       .then(data => {
         if (Array.isArray(data)) {
@@ -59,7 +63,13 @@ export default function HomeScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView
-        contentContainerStyle={styles.container}
+        contentContainerStyle={[
+          styles.container,
+          {
+            paddingTop: Math.max(insets.top, Platform.OS === 'android' ? 16 : 8),
+            paddingBottom: insets.bottom + 90,
+          },
+        ]}
         showsVerticalScrollIndicator={false}
         bounces={false}
       >
@@ -151,12 +161,17 @@ export default function HomeScreen() {
 
           <View style={styles.joinCard}>
             <TextInput
-              style={styles.pinInputFull}
+              style={[
+                styles.pinInputFull,
+                { letterSpacing: pin.length > 0 ? 8 : 0, fontSize: pin.length > 0 ? 22 : 15 }
+              ]}
               placeholder="Enter 4-Digit PIN"
               placeholderTextColor="#475569"
               keyboardType="number-pad"
               maxLength={4}
               value={pin}
+              cursorColor="#38BDF8"
+              selectionColor="rgba(56, 189, 248, 0.4)"
               onChangeText={(val) => {
                 setPin(val);
                 setError('');

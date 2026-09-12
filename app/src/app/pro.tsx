@@ -4,6 +4,7 @@ import {
   SafeAreaView, Platform, ActivityIndicator
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   Crown, Check, Zap, Sparkles, ShieldCheck, ArrowLeft,
   Headphones, Volume2, Users, Building2, Radio, CheckCircle2,
@@ -16,6 +17,7 @@ import { getActivePlan, setActivePlan, ActivePlanData } from '../services/hostSt
 
 export default function ProScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('yearly');
   const [currentPlan, setCurrentPlan] = useState<ActivePlanData>(getActivePlan());
   const [loading, setLoading] = useState<boolean>(false);
@@ -153,7 +155,13 @@ export default function ProScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView
-        contentContainerStyle={styles.container}
+        contentContainerStyle={[
+          styles.container,
+          {
+            paddingTop: Math.max(insets.top, Platform.OS === 'android' ? 16 : 8),
+            paddingBottom: insets.bottom + 90,
+          }
+        ]}
         showsVerticalScrollIndicator={false}
         bounces={false}
       >

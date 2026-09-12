@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
 import { useRouter, usePathname } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Film, Radio, Crown, SlidersHorizontal, Headphones, Sparkles } from 'lucide-react-native';
 
 interface NavItem {
@@ -15,6 +16,7 @@ interface NavItem {
 export const FloatingNavBar: React.FC = () => {
   const router = useRouter();
   const pathname = usePathname();
+  const insets = useSafeAreaInsets();
 
   const navItems: NavItem[] = [
     {
@@ -47,8 +49,10 @@ export const FloatingNavBar: React.FC = () => {
     },
   ];
 
+  const bottomInset = Math.max(insets.bottom, 12);
+
   return (
-    <View style={styles.container} pointerEvents="box-none">
+    <View style={[styles.container, { bottom: bottomInset + 8 }]} pointerEvents="box-none">
       <View style={styles.navBar}>
         {navItems.map((item) => {
           const isActive = pathname === item.route;

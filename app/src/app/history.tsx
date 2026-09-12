@@ -4,6 +4,7 @@ import {
   SafeAreaView, ActivityIndicator, RefreshControl, Platform
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   History, Users, Film, Headphones, ArrowLeft,
   RefreshCw, CheckCircle2, Clock, Smartphone, Radio,
@@ -12,6 +13,7 @@ import {
 import { FloatingNavBar } from '../components/FloatingNavBar';
 import { BudcastLogo } from '../components/BudcastLogo';
 import { getHostId } from '../services/hostStorage';
+import { getApiBaseUrl } from '../services/apiConfig';
 
 interface ListenerRecord {
   id: number;
@@ -37,6 +39,7 @@ interface RoomRecord {
 
 export default function ActivityHistoryScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState<'listeners' | 'rooms'>('listeners');
   const [listeners, setListeners] = useState<ListenerRecord[]>([]);
   const [rooms, setRooms] = useState<RoomRecord[]>([]);
@@ -46,9 +49,10 @@ export default function ActivityHistoryScreen() {
   const fetchHistoryData = async () => {
     try {
       const hostId = getHostId();
+      const baseUrl = getApiBaseUrl();
       const [resListeners, resRooms] = await Promise.all([
-        fetch(`http://localhost:4000/api/history/listeners?hostId=${encodeURIComponent(hostId)}`).then(r => r.json()).catch(() => []),
-        fetch(`http://localhost:4000/api/history/rooms?hostId=${encodeURIComponent(hostId)}`).then(r => r.json()).catch(() => [])
+        fetch(`${baseUrl}/api/history/listeners?hostId=${encodeURIComponent(hostId)}`).then(r => r.json()).catch(() => []),
+        fetch(`${baseUrl}/api/history/rooms?hostId=${encodeURIComponent(hostId)}`).then(r => r.json()).catch(() => [])
       ]);
 
       if (Array.isArray(resListeners)) setListeners(resListeners);
@@ -73,7 +77,8 @@ export default function ActivityHistoryScreen() {
   const handleClearHistory = async () => {
     try {
       setLoading(true);
-      await fetch('http://localhost:4000/api/history/clear', { method: 'POST' });
+      const baseUrl = getApiBaseUrl();
+      await fetch(`${baseUrl}/api/history/clear`, { method: 'POST' });
       setListeners([]);
       setRooms([]);
     } catch (e) {

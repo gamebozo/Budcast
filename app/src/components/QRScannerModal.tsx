@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Modal, TextInput, Platform, SafeAreaView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Modal, TextInput, Platform, SafeAreaView, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
-import { X, Camera, QrCode, Upload, AlertCircle, CheckCircle2 } from 'lucide-react-native';
+import { X, Camera, QrCode, Upload, AlertCircle, CheckCircle2, RefreshCw } from 'lucide-react-native';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import jsQR from 'jsqr';
 import { BudcastLogo } from './BudcastLogo';
 
@@ -18,6 +19,7 @@ export function QRScannerModal({ visible, onClose, onScannedPin }: QRScannerModa
   const [error, setError] = useState('');
   const [cameraActive, setCameraActive] = useState(false);
   const [scanSuccess, setScanSuccess] = useState(false);
+  const [permission, requestPermission] = useCameraPermissions();
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -296,7 +298,81 @@ export function QRScannerModal({ visible, onClose, onScannedPin }: QRScannerModa
                       </div>
                     )}
                   </div>
-                ) : null}
+                ) : (
+                  <View style={{ width: 260, height: 260, position: 'relative', backgroundColor: '#000', borderRadius: 16, overflow: 'hidden' }}>
+                    {!permission ? (
+                      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                        <ActivityIndicator color="#38BDF8" size="large" />
+                      </View>
+                    ) : !permission.granted ? (
+                      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 16 }}>
+                        <Camera size={32} color="#38BDF8" style={{ marginBottom: 12 }} />
+                        <Text style={{ color: '#F8FAFC', fontSize: 13, fontWeight: '700', textAlign: 'center', marginBottom: 6 }}>
+                          Camera Access Needed
+                        </Text>
+                        <Text style={{ color: '#94A3B8', fontSize: 11, textAlign: 'center', marginBottom: 14 }}>
+                          Allow camera access to instantly scan host QR codes
+                        </Text>
+                        <TouchableOpacity
+                          style={{ backgroundColor: '#38BDF8', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10 }}
+                          onPress={requestPermission}
+                        >
+                          <Text style={{ color: '#050814', fontSize: 12, fontWeight: '800' }}>Grant Permission</Text>
+                        </TouchableOpacity>
+                      </View>
+                    ) : (
+                      <>
+                        <CameraView
+                          style={{ width: 260, height: 260 }}
+                          facing="back"
+                          barcodeScannerSettings={{
+                            barcodeTypes: ['qr'],
+                          }}
+                          onBarcodeScanned={({ data }) => {
+                            if (!scanSuccess && data) {
+                              handleScannedData(data);
+                            }
+                          }}
+                        />
+                        {/* Viewfinder Target Border Overlay */}
+                        <View
+                          pointerEvents="none"
+                          style={{
+                            position: 'absolute',
+                            top: 24,
+                            left: 24,
+                            right: 24,
+                            bottom: 24,
+                            borderWidth: 2,
+                            borderColor: '#38BDF8',
+                            borderRadius: 14,
+                            borderStyle: 'dashed',
+                          }}
+                        />
+                        {scanSuccess && (
+                          <View
+                            style={{
+                              position: 'absolute',
+                              top: 0,
+                              left: 0,
+                              right: 0,
+                              bottom: 0,
+                              backgroundColor: 'rgba(5, 8, 20, 0.92)',
+                              justifyContent: 'center',
+                              alignItems: 'center',
+                              gap: 10,
+                            }}
+                          >
+                            <CheckCircle2 size={44} color="#10B981" />
+                            <Text style={{ fontSize: 14, fontWeight: '800', color: '#10B981' }}>
+                              QR Verified! Connecting...
+                            </Text>
+                          </View>
+                        )}
+                      </>
+                    )}
+                  </View>
+                )}
               </View>
 
               <Text style={styles.scannerHint}>

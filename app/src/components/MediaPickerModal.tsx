@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Modal, TextInput, ScrollView,
 import { MediaItem } from '../types/sync';
 import { X, Film, Music, Link2, Check, Sparkles, Upload, FileVideo, FileAudio, Mic } from 'lucide-react-native';
 import * as DocumentPicker from 'expo-document-picker';
+import { getApiBaseUrl } from '../services/apiConfig';
 
 interface Props {
   visible: boolean;
@@ -35,27 +36,43 @@ export const MediaPickerModal: React.FC<Props> = ({
 
         if (!result.canceled && result.assets && result.assets[0]) {
           const asset = result.assets[0];
-          setUploading(true);
-
           const isVideo = asset.mimeType?.startsWith('video');
-          const formData = new FormData();
-          formData.append('media', {
-            uri: asset.uri,
-            name: asset.name,
-            type: asset.mimeType || (isVideo ? 'video/mp4' : 'audio/mp3')
-          } as any);
-          formData.append('title', asset.name.replace(/\.[^/.]+$/, ''));
 
-          const response = await fetch('http://localhost:4000/api/upload', {
-            method: 'POST',
-            body: formData,
-            headers: { 'Content-Type': 'multipart/form-data' }
-          });
-          const data = await response.json();
-          if (data && data.url) {
-            onSelect(data);
-            onClose();
+          // Instantly prepare media item
+          const localItem: MediaItem = {
+            id: 'local-' + Date.now(),
+            title: asset.name.replace(/\.[^/.]+$/, ''),
+            type: isVideo ? 'video' : 'audio',
+            url: asset.uri,
+            filename: asset.name,
+            size: asset.size
+          };
+
+          setUploading(true);
+          try {
+            const formData = new FormData();
+            formData.append('media', {
+              uri: asset.uri,
+              name: asset.name,
+              type: asset.mimeType || (isVideo ? 'video/mp4' : 'audio/mp3')
+            } as any);
+            formData.append('title', asset.name.replace(/\.[^/.]+$/, ''));
+
+            const response = await fetch(`${getApiBaseUrl()}/api/upload`, {
+              method: 'POST',
+              body: formData,
+              headers: { 'Content-Type': 'multipart/form-data' }
+            });
+            const data = await response.json();
+            if (data && data.url) {
+              onSelect(data);
+            } else {
+              onSelect(localItem);
+            }
+          } catch (uploadErr) {
+            onSelect(localItem);
           }
+          onClose();
         }
       } catch (e) {
         console.error('Upload error:', e);
@@ -75,7 +92,7 @@ export const MediaPickerModal: React.FC<Props> = ({
     formData.append('title', file.name.replace(/\.[^/.]+$/, ''));
 
     try {
-      const response = await fetch('http://localhost:4000/api/upload', {
+      const response = await fetch(`${getApiBaseUrl()}/api/upload`, {
         method: 'POST',
         body: formData
       });

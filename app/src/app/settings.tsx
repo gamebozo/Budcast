@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView, Switch, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   SlidersHorizontal, Volume2, Wifi, Zap, ArrowLeft, RefreshCw,
   Sparkles, Check, Headphones, ShieldCheck, Play, Radio,
@@ -21,6 +22,7 @@ const EARBUD_PRESETS = [
 
 export default function SettingsScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [audioBoost, setAudioBoost] = useState(true);
   const [lowLatency, setLowLatency] = useState(true);
   const [spatialAudio, setSpatialAudio] = useState(true);
@@ -63,7 +65,16 @@ export default function SettingsScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.container,
+          {
+            paddingTop: Math.max(insets.top, Platform.OS === 'android' ? 16 : 8),
+            paddingBottom: insets.bottom + 90,
+          }
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
         {/* Top Header */}
         <View style={styles.topBar}>
           <TouchableOpacity style={styles.backBtn} onPress={() => router.push('/' as any)}>
