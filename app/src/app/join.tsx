@@ -196,8 +196,8 @@ export default function JoinScreen() {
         style={[
           styles.container,
           {
-            paddingTop: Math.max(insets.top + 8, 36),
-            paddingBottom: Math.max(insets.bottom + 20, 30)
+            paddingTop: Math.max(insets.top + 6, 16),
+            paddingBottom: Math.max(insets.bottom + 16, 20)
           }
         ]}
       >

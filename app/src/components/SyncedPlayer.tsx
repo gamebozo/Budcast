@@ -1,12 +1,33 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Platform, Dimensions } from 'react-native';
 import { MediaItem, MediaMode, PlaybackState, SyncEvent } from '../types/sync';
 import { syncEngine } from '../services/syncEngine';
 import {
   Play, Pause, Volume2, VolumeX, Maximize, Minimize,
   RotateCcw, RotateCw, Sparkles, Radio, Activity, Music,
-  Zap, AlertCircle
+  Zap, AlertCircle, Film
 } from 'lucide-react-native';
+
+// Conditional imports for native video
+let VideoView: any = null;
+let useVideoPlayer: any = null;
+let createAudioPlayer: any = null;
+
+if (Platform.OS !== 'web') {
+  try {
+    const videoMod = require('expo-video');
+    VideoView = videoMod.VideoView;
+    useVideoPlayer = videoMod.useVideoPlayer;
+  } catch (e) {
+    console.log('Native expo-video load:', e);
+  }
+  try {
+    const audioMod = require('expo-audio');
+    createAudioPlayer = audioMod.createAudioPlayer;
+  } catch (e) {
+    console.log('Native expo-audio load:', e);
+  }
+}
 
 interface Props {
   media: MediaItem;
@@ -27,8 +48,7 @@ export const SyncedPlayer: React.FC<Props> = ({
 }) => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const hideControlsTimer = useRef<any>(null);
+  const nativeAudioRef = useRef<any>(null);
 
   const [isPlaying, setIsPlaying] = useState(initialPlaybackState?.isPlaying || false);
   const [currentTime, setCurrentTime] = useState(initialPlaybackState?.currentTime || 0);
@@ -42,194 +62,215 @@ export const SyncedPlayer: React.FC<Props> = ({
   const [playbackError, setPlaybackError] = useState<string>('');
   const [skipFeedback, setSkipFeedback] = useState<'left' | 'right' | null>(null);
 
-  // Auto-hide controls effect when playing
+  // Native Video Player instance from expo-video
+  let nativePlayer: any = null;
+  if (Platform.OS !== 'web' && useVideoPlayer && mode === 'video') {
+    nativePlayer = useVideoPlayer(media.url, (p: any) => {
+      p.loop = false;
+      p.muted = isMuted;
+      if (initialPlaybackState?.isPlaying) {
+        p.play();
+      }
+    });
+  }
+
+  // Native Audio player setup
   useEffect(() => {
-    if (isPlaying) {
-      if (hideControlsTimer.current) clearTimeout(hideControlsTimer.current);
-      hideControlsTimer.current = setTimeout(() => {
-        setShowControls(false);
-      }, 2000);
-    } else {
-      setShowControls(true);
+    if (Platform.OS !== 'web' && createAudioPlayer && mode === 'audio' && media.url) {
+      try {
+        const p = createAudioPlayer({ uri: media.url });
+        nativeAudioRef.current = p;
+        if (initialPlaybackState?.isPlaying) {
+          p.play();
+        }
+      } catch (e) {
+        console.log('Native audio player init error:', e);
+      }
+      return () => {
+        if (nativeAudioRef.current) {
+          try {
+            nativeAudioRef.current.pause();
+          } catch(e){}
+        }
+      };
     }
-    return () => {
-      if (hideControlsTimer.current) clearTimeout(hideControlsTimer.current);
-    };
-  }, [isPlaying]);
-
-  const handleMouseMove = () => {
-    setShowControls(true);
-    if (hideControlsTimer.current) clearTimeout(hideControlsTimer.current);
-    if (isPlaying) {
-      hideControlsTimer.current = setTimeout(() => {
-        setShowControls(false);
-      }, 2000);
-    }
-  };
-
-  const handleMouseLeave = () => {
-    if (isPlaying) {
-      setShowControls(false);
-    }
-  };
+  }, [media.url, mode]);
 
   // Sync event listener from socket
   useEffect(() => {
     if (!syncEvent) return;
-    const mediaEl = mode === 'video' ? videoRef.current : audioRef.current;
-    if (!mediaEl) return;
 
-    if (syncEvent.action === 'PLAY') {
-      const serverNow = syncEngine.getServerTime();
-      const delayMs = (syncEvent.scheduledStartServerTime || serverNow) - serverNow;
+    if (Platform.OS === 'web') {
+      const mediaEl = mode === 'video' ? videoRef.current : audioRef.current;
+      if (!mediaEl) return;
 
-      if (typeof syncEvent.currentTime === 'number') {
-        mediaEl.currentTime = syncEvent.currentTime;
-      }
+      if (syncEvent.action === 'PLAY') {
+        const serverNow = syncEngine.getServerTime();
+        const delayMs = (syncEvent.scheduledStartServerTime || serverNow) - serverNow;
 
-      if (delayMs > 0) {
-        setTimeout(() => {
-          mediaEl.play().catch(e => {
-            console.log('Autoplay wait:', e);
-            setPlaybackError('Tap screen to allow audio & start playing');
-          });
+        if (typeof syncEvent.currentTime === 'number') {
+          mediaEl.currentTime = syncEvent.currentTime;
+        }
+
+        if (delayMs > 0) {
+          setTimeout(() => {
+            mediaEl.play().catch(e => console.log('Web play err:', e));
+            setIsPlaying(true);
+          }, delayMs);
+        } else {
+          const elapsedSec = Math.max(0, -delayMs / 1000);
+          mediaEl.currentTime = (syncEvent.currentTime || 0) + elapsedSec;
+          mediaEl.play().catch(e => console.log('Web play err:', e));
           setIsPlaying(true);
-        }, delayMs);
-      } else {
-        const elapsedSec = Math.max(0, -delayMs / 1000);
-        mediaEl.currentTime = (syncEvent.currentTime || 0) + elapsedSec;
-        mediaEl.play().catch(e => {
-          console.log('Autoplay wait:', e);
-          setPlaybackError('Tap screen to allow audio & start playing');
-        });
+        }
+      } else if (syncEvent.action === 'PAUSE') {
+        mediaEl.pause();
+        if (typeof syncEvent.currentTime === 'number') {
+          mediaEl.currentTime = syncEvent.currentTime;
+        }
+        setIsPlaying(false);
+      } else if (syncEvent.action === 'SEEK') {
+        if (typeof syncEvent.currentTime === 'number') {
+          mediaEl.currentTime = syncEvent.currentTime;
+          setCurrentTime(syncEvent.currentTime);
+        }
+        if (syncEvent.isPlaying) {
+          mediaEl.play().catch(e => console.log('Seek play:', e));
+          setIsPlaying(true);
+        }
+      }
+    } else {
+      // Native Player sync handling
+      const p = mode === 'video' ? nativePlayer : nativeAudioRef.current;
+      if (!p) return;
+
+      if (syncEvent.action === 'PLAY') {
+        if (typeof syncEvent.currentTime === 'number') {
+          if (p.currentTime !== undefined) p.currentTime = syncEvent.currentTime;
+          else if (p.seekTo) p.seekTo(syncEvent.currentTime);
+        }
+        p.play?.();
         setIsPlaying(true);
-      }
-    } else if (syncEvent.action === 'PAUSE') {
-      mediaEl.pause();
-      if (typeof syncEvent.currentTime === 'number') {
-        mediaEl.currentTime = syncEvent.currentTime;
-      }
-      setIsPlaying(false);
-    } else if (syncEvent.action === 'SEEK') {
-      if (typeof syncEvent.currentTime === 'number') {
-        mediaEl.currentTime = syncEvent.currentTime;
-        setCurrentTime(syncEvent.currentTime);
-      }
-      if (syncEvent.isPlaying) {
-        mediaEl.play().catch(e => console.log('Seek play:', e));
-        setIsPlaying(true);
+      } else if (syncEvent.action === 'PAUSE') {
+        p.pause?.();
+        if (typeof syncEvent.currentTime === 'number') {
+          if (p.currentTime !== undefined) p.currentTime = syncEvent.currentTime;
+          else if (p.seekTo) p.seekTo(syncEvent.currentTime);
+        }
+        setIsPlaying(false);
+      } else if (syncEvent.action === 'SEEK') {
+        if (typeof syncEvent.currentTime === 'number') {
+          if (p.currentTime !== undefined) p.currentTime = syncEvent.currentTime;
+          else if (p.seekTo) p.seekTo(syncEvent.currentTime);
+          setCurrentTime(syncEvent.currentTime);
+        }
+        if (syncEvent.isPlaying) {
+          p.play?.();
+          setIsPlaying(true);
+        }
       }
     }
-  }, [syncEvent, mode]);
+  }, [syncEvent, mode, nativePlayer]);
 
   // Periodic drift check & time update
   useEffect(() => {
     const interval = setInterval(() => {
-      const mediaEl = mode === 'video' ? videoRef.current : audioRef.current;
-      if (!mediaEl) return;
+      let cur = 0;
+      let dur = duration;
 
-      setCurrentTime(mediaEl.currentTime);
-      if (mediaEl.duration && !isNaN(mediaEl.duration) && mediaEl.duration > 0) {
-        setDuration(mediaEl.duration);
+      if (Platform.OS === 'web') {
+        const mediaEl = mode === 'video' ? videoRef.current : audioRef.current;
+        if (mediaEl) {
+          cur = mediaEl.currentTime;
+          if (mediaEl.duration && !isNaN(mediaEl.duration) && mediaEl.duration > 0) {
+            dur = mediaEl.duration;
+          }
+        }
+      } else {
+        const p = mode === 'video' ? nativePlayer : nativeAudioRef.current;
+        if (p) {
+          cur = p.currentTime || (p.currentStatus?.positionMillis ? p.currentStatus.positionMillis / 1000 : currentTime);
+          if (p.duration && !isNaN(p.duration)) dur = p.duration;
+        }
       }
+
+      setCurrentTime(cur);
+      if (dur > 0 && dur !== duration) setDuration(dur);
 
       if (!isHost && isPlaying && initialPlaybackState) {
         const serverNow = syncEngine.getServerTime();
         const expectedTime = initialPlaybackState.currentTime +
           ((serverNow - initialPlaybackState.lastUpdatedServerTime) / 1000);
 
-        const currentDrift = Math.abs(mediaEl.currentTime - expectedTime);
+        const currentDrift = Math.abs(cur - expectedTime);
         setDriftMs(Math.round(currentDrift * 1000));
-
-        if (currentDrift > 0.08 && currentDrift < 0.5) {
-          mediaEl.playbackRate = mediaEl.currentTime < expectedTime ? 1.04 : 0.96;
-        } else if (currentDrift >= 0.5) {
-          mediaEl.currentTime = expectedTime;
-          mediaEl.playbackRate = 1.0;
-        } else {
-          mediaEl.playbackRate = 1.0;
-        }
       }
-    }, 300);
+    }, 400);
 
     return () => clearInterval(interval);
-  }, [isPlaying, isHost, initialPlaybackState, mode]);
-
-  // Keyboard Shortcuts (Space, Arrow keys, F, M)
-  useEffect(() => {
-    if (Platform.OS !== 'web') return;
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (['INPUT', 'TEXTAREA'].includes((e.target as any)?.tagName)) return;
-
-      if (e.code === 'Space') {
-        e.preventDefault();
-        togglePlay();
-      } else if (e.code === 'ArrowLeft') {
-        e.preventDefault();
-        handleSeekJump(-10);
-      } else if (e.code === 'ArrowRight') {
-        e.preventDefault();
-        handleSeekJump(10);
-      } else if (e.code === 'KeyF') {
-        e.preventDefault();
-        toggleFullscreen();
-      } else if (e.code === 'KeyM') {
-        e.preventDefault();
-        toggleMute();
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  });
+  }, [isPlaying, isHost, initialPlaybackState, mode, duration, nativePlayer]);
 
   const togglePlay = () => {
     setPlaybackError('');
-    handleMouseMove();
-    const mediaEl = mode === 'video' ? videoRef.current : audioRef.current;
-    if (!mediaEl) return;
+    if (Platform.OS === 'web') {
+      const mediaEl = mode === 'video' ? videoRef.current : audioRef.current;
+      if (!mediaEl) return;
 
-    if (isHost) {
-      if (mediaEl.paused) {
-        mediaEl.play()
-          .then(() => {
-            setIsPlaying(true);
-            if (onHostAction) {
-              onHostAction('PLAY', { currentTime: mediaEl.currentTime, delay: 100 });
-            }
-          })
-          .catch(err => {
-            console.error('Play error:', err);
-            setPlaybackError('Click to interact and enable playback');
-          });
+      if (isHost) {
+        if (mediaEl.paused) {
+          mediaEl.play()
+            .then(() => {
+              setIsPlaying(true);
+              if (onHostAction) onHostAction('PLAY', { currentTime: mediaEl.currentTime, delay: 100 });
+            })
+            .catch(err => {
+              console.error('Play error:', err);
+              setPlaybackError('Tap to enable audio');
+            });
+        } else {
+          mediaEl.pause();
+          setIsPlaying(false);
+          if (onHostAction) onHostAction('PAUSE', { currentTime: mediaEl.currentTime });
+        }
       } else {
-        mediaEl.pause();
-        setIsPlaying(false);
-        if (onHostAction) {
-          onHostAction('PAUSE', { currentTime: mediaEl.currentTime });
+        if (mediaEl.paused) {
+          mediaEl.play().then(() => setIsPlaying(true)).catch(e => console.log(e));
+        } else {
+          mediaEl.pause();
+          setIsPlaying(false);
         }
       }
     } else {
-      if (mediaEl.paused) {
-        mediaEl.play()
-          .then(() => setIsPlaying(true))
-          .catch(e => console.log('Guest play:', e));
-      } else {
-        mediaEl.pause();
+      // Native Play / Pause
+      const p = mode === 'video' ? nativePlayer : nativeAudioRef.current;
+      if (!p) return;
+
+      if (isPlaying) {
+        p.pause?.();
         setIsPlaying(false);
+        if (isHost && onHostAction) onHostAction('PAUSE', { currentTime });
+      } else {
+        p.play?.();
+        setIsPlaying(true);
+        if (isHost && onHostAction) onHostAction('PLAY', { currentTime, delay: 100 });
       }
     }
   };
 
   const handleSeekJump = (seconds: number) => {
-    handleMouseMove();
-    const mediaEl = mode === 'video' ? videoRef.current : audioRef.current;
-    if (!mediaEl) return;
-
-    const targetTime = Math.max(0, Math.min(duration || 9999, mediaEl.currentTime + seconds));
-    mediaEl.currentTime = targetTime;
+    const targetTime = Math.max(0, Math.min(duration || 9999, currentTime + seconds));
     setCurrentTime(targetTime);
+
+    if (Platform.OS === 'web') {
+      const mediaEl = mode === 'video' ? videoRef.current : audioRef.current;
+      if (mediaEl) mediaEl.currentTime = targetTime;
+    } else {
+      const p = mode === 'video' ? nativePlayer : nativeAudioRef.current;
+      if (p) {
+        if (p.currentTime !== undefined) p.currentTime = targetTime;
+        else if (p.seekTo) p.seekTo(targetTime);
+      }
+    }
 
     setSkipFeedback(seconds < 0 ? 'left' : 'right');
     setTimeout(() => setSkipFeedback(null), 600);
@@ -239,53 +280,15 @@ export const SyncedPlayer: React.FC<Props> = ({
     }
   };
 
-  const handleScrubberClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!isHost) return;
-    const mediaEl = mode === 'video' ? videoRef.current : audioRef.current;
-    if (!mediaEl || !duration) return;
-
-    const rect = e.currentTarget.getBoundingClientRect();
-    const pos = (e.clientX - rect.left) / rect.width;
-    const targetTime = Math.max(0, Math.min(duration, pos * duration));
-
-    mediaEl.currentTime = targetTime;
-    setCurrentTime(targetTime);
-
-    if (onHostAction) {
-      onHostAction('SEEK', { currentTime: targetTime, delay: 100, isPlaying });
-    }
-  };
-
   const toggleMute = () => {
-    const mediaEl = mode === 'video' ? videoRef.current : audioRef.current;
-    if (!mediaEl) return;
-    mediaEl.muted = !mediaEl.muted;
-    setIsMuted(mediaEl.muted);
-  };
-
-  const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = parseFloat(e.target.value);
-    setVolume(val);
-    const mediaEl = mode === 'video' ? videoRef.current : audioRef.current;
-    if (mediaEl) {
-      mediaEl.volume = val;
-      mediaEl.muted = val === 0;
-      setIsMuted(val === 0);
-    }
-  };
-
-  const toggleFullscreen = () => {
+    const nextMuted = !isMuted;
+    setIsMuted(nextMuted);
     if (Platform.OS === 'web') {
-      const elem = containerRef.current || videoRef.current;
-      if (!elem) return;
-
-      if (!document.fullscreenElement) {
-        elem.requestFullscreen?.();
-        setIsFullscreen(true);
-      } else {
-        document.exitFullscreen?.();
-        setIsFullscreen(false);
-      }
+      const mediaEl = mode === 'video' ? videoRef.current : audioRef.current;
+      if (mediaEl) mediaEl.muted = nextMuted;
+    } else {
+      const p = mode === 'video' ? nativePlayer : nativeAudioRef.current;
+      if (p && p.muted !== undefined) p.muted = nextMuted;
     }
   };
 
@@ -300,32 +303,11 @@ export const SyncedPlayer: React.FC<Props> = ({
 
   return (
     <View style={styles.container}>
-      {/* Viewport Stage */}
       <View style={styles.stage}>
-        {Platform.OS === 'web' ? (
-          mode === 'video' ? (
-            <div
-              ref={containerRef as any}
-              style={{
-                position: 'relative',
-                width: '100%',
-                aspectRatio: '16/9',
-                backgroundColor: '#000000',
-                borderRadius: isFullscreen ? '0px' : '16px',
-                overflow: 'hidden',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                userSelect: 'none',
-                boxShadow: '0 20px 40px -15px rgba(0,0,0,0.9)',
-                cursor: showControls ? 'default' : 'none'
-              }}
-              onMouseMove={handleMouseMove}
-              onMouseEnter={() => setShowControls(true)}
-              onMouseLeave={handleMouseLeave}
-              onClick={handleMouseMove}
-            >
-              {/* HTML5 Native Video Tag */}
+        {/* VIDEO MODE */}
+        {mode === 'video' ? (
+          <View style={styles.videoWrapper}>
+            {Platform.OS === 'web' ? (
               <video
                 ref={videoRef}
                 src={media.url}
@@ -338,464 +320,101 @@ export const SyncedPlayer: React.FC<Props> = ({
                   backgroundColor: '#000',
                   cursor: 'pointer'
                 }}
-                onPlay={() => {
-                  setIsPlaying(true);
-                  setPlaybackError('');
-                }}
+                onPlay={() => setIsPlaying(true)}
                 onPause={() => setIsPlaying(false)}
                 onLoadedMetadata={(e: any) => {
                   if (e.target.duration && !isNaN(e.target.duration)) {
                     setDuration(e.target.duration);
                   }
                 }}
-                onError={() => {
-                  setPlaybackError('Failed to load video format');
-                }}
                 onClick={togglePlay}
               />
+            ) : VideoView && nativePlayer ? (
+              <VideoView
+                player={nativePlayer}
+                style={styles.nativeVideo}
+                allowsFullscreen
+                allowsPictureInPicture
+                contentFit="contain"
+              />
+            ) : (
+              <View style={styles.audioStage}>
+                <Film size={36} color="#38BDF8" />
+                <Text style={styles.mediaTitleText}>{media.title || 'Movie Broadcast'}</Text>
+              </View>
+            )}
 
-              {/* YouTube-Style Double Tap Skip Ripple Indicators */}
-              {skipFeedback === 'left' && (
-                <div style={{
-                  position: 'absolute',
-                  left: '15%',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  backgroundColor: 'rgba(0,0,0,0.7)',
-                  padding: '12px 18px',
-                  borderRadius: '24px',
-                  color: '#FFF',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  fontSize: '13px',
-                  fontWeight: '800',
-                  zIndex: 35,
-                  pointerEvents: 'none'
-                }}>
-                  <RotateCcw size={18} color="#38BDF8" />
-                  <span>-10s</span>
-                </div>
-              )}
+            {/* Top Bar Overlay */}
+            <View style={styles.topOverlay}>
+              <Text style={styles.mediaTitle} numberOfLines={1}>{media.title}</Text>
+              <View style={styles.lockBadge}>
+                <View style={styles.lockDot} />
+                <Text style={styles.lockText}>
+                  {isHost ? 'HOST STREAM' : driftMs < 40 ? 'EARBUDS LOCKED' : `${driftMs}ms`}
+                </Text>
+              </View>
+            </View>
 
-              {skipFeedback === 'right' && (
-                <div style={{
-                  position: 'absolute',
-                  right: '15%',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  backgroundColor: 'rgba(0,0,0,0.7)',
-                  padding: '12px 18px',
-                  borderRadius: '24px',
-                  color: '#FFF',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  fontSize: '13px',
-                  fontWeight: '800',
-                  zIndex: 35,
-                  pointerEvents: 'none'
-                }}>
-                  <span>+10s</span>
-                  <RotateCw size={18} color="#38BDF8" />
-                </div>
-              )}
+            {/* Skip Feedback Icons */}
+            {skipFeedback === 'left' && (
+              <View style={[styles.skipBadge, { left: '15%' }]}>
+                <RotateCcw size={16} color="#38BDF8" />
+                <Text style={styles.skipText}>-10s</Text>
+              </View>
+            )}
+            {skipFeedback === 'right' && (
+              <View style={[styles.skipBadge, { right: '15%' }]}>
+                <Text style={styles.skipText}>+10s</Text>
+                <RotateCw size={16} color="#38BDF8" />
+              </View>
+            )}
 
-              {/* Top Gradient Header Overlay */}
-              <div
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  padding: '12px 16px',
-                  background: 'linear-gradient(180deg, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0) 100%)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  opacity: showControls ? 1 : 0,
-                  transition: 'opacity 0.3s ease',
-                  pointerEvents: showControls ? 'auto' : 'none',
-                  zIndex: 25
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ color: '#FFF', fontSize: '13px', fontWeight: '800', textShadow: '0 1px 4px rgba(0,0,0,0.8)' }}>
-                    {media.title}
-                  </span>
-                </div>
+            {/* Bottom Controls Bar */}
+            <View style={styles.bottomControlsBar}>
+              {/* Scrubber Track */}
+              <View style={styles.scrubberRail}>
+                <View style={[styles.scrubberProgress, { width: `${progressPercent}%` }]} />
+              </View>
 
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  backgroundColor: 'rgba(15, 23, 42, 0.85)',
-                  padding: '4px 10px',
-                  borderRadius: '20px',
-                  border: '1px solid rgba(255, 255, 255, 0.15)'
-                }}>
-                  <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#10B981', boxShadow: '0 0 8px #10B981' }} />
-                  <span style={{ fontSize: '10px', fontWeight: '800', color: '#CBD5E1', letterSpacing: '0.5px' }}>
-                    {isHost ? 'HOST STREAM' : driftMs < 40 ? 'EARBUDS LOCKED' : `${driftMs}ms`}
-                  </span>
-                </div>
-              </div>
+              <View style={styles.controlsRow}>
+                {/* Play / 10s Rewind / 10s Forward / Timecode */}
+                <View style={styles.controlsLeft}>
+                  <TouchableOpacity onPress={togglePlay} style={styles.iconBtn}>
+                    {isPlaying ? <Pause size={18} color="#FFF" /> : <Play size={18} color="#FFF" />}
+                  </TouchableOpacity>
 
-              {/* CENTER OVERLAY: Sleek compact 10s Back, Play/Pause, 10s Forward with Auto-Fade */}
-              <div
-                style={{
-                  position: 'absolute',
-                  top: '50%',
-                  left: '50%',
-                  transform: `translate(-50%, -50%) scale(${showControls ? 1 : 0.92})`,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '18px',
-                  opacity: showControls ? 1 : 0,
-                  transition: 'opacity 0.3s ease, transform 0.3s ease',
-                  pointerEvents: showControls ? 'auto' : 'none',
-                  zIndex: 30
-                }}
-              >
-                {/* 10s Backward */}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleSeekJump(-10);
-                  }}
-                  title="Rewind 10s"
-                  style={{
-                    width: '38px',
-                    height: '38px',
-                    borderRadius: '50%',
-                    backgroundColor: 'rgba(15, 23, 42, 0.7)',
-                    backdropFilter: 'blur(8px)',
-                    border: '1px solid rgba(255, 255, 255, 0.2)',
-                    color: '#FFFFFF',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: 'pointer',
-                    transition: 'transform 0.15s ease'
-                  }}
+                  <TouchableOpacity onPress={() => handleSeekJump(-10)} style={styles.iconBtn}>
+                    <RotateCcw size={15} color="#CBD5E1" />
+                  </TouchableOpacity>
+
+                  <TouchableOpacity onPress={() => handleSeekJump(10)} style={styles.iconBtn}>
+                    <RotateCw size={15} color="#CBD5E1" />
+                  </TouchableOpacity>
+
+                  <TouchableOpacity onPress={toggleMute} style={styles.iconBtn}>
+                    {isMuted ? <VolumeX size={16} color="#EF4444" /> : <Volume2 size={16} color="#CBD5E1" />}
+                  </TouchableOpacity>
+
+                  <Text style={styles.timecodeText}>
+                    {formatTime(currentTime)} / {formatTime(duration)}
+                  </Text>
+                </View>
+
+                {/* Right controls: Boost badge */}
+                <TouchableOpacity
+                  onPress={() => setAudioBoost(!audioBoost)}
+                  style={[styles.boostBadge, audioBoost && styles.boostBadgeActive]}
                 >
-                  <RotateCcw size={16} color="#FFFFFF" />
-                  <span style={{ fontSize: '7px', fontWeight: '900', color: '#38BDF8' }}>10</span>
-                </button>
-
-                {/* Sleek Center Play / Pause */}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    togglePlay();
-                  }}
-                  title={isPlaying ? 'Pause' : 'Play'}
-                  style={{
-                    width: '50px',
-                    height: '50px',
-                    borderRadius: '50%',
-                    backgroundColor: 'rgba(15, 23, 42, 0.85)',
-                    backdropFilter: 'blur(10px)',
-                    border: '1.5px solid rgba(56, 189, 248, 0.6)',
-                    color: '#38BDF8',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: 'pointer',
-                    boxShadow: '0 0 20px rgba(56, 189, 248, 0.35)',
-                    transition: 'transform 0.15s ease'
-                  }}
-                >
-                  {isPlaying ? (
-                    <Pause size={22} color="#38BDF8" fill="#38BDF8" />
-                  ) : (
-                    <Play size={22} color="#38BDF8" fill="#38BDF8" style={{ marginLeft: 2 }} />
-                  )}
-                </button>
-
-                {/* 10s Forward */}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleSeekJump(10);
-                  }}
-                  title="Forward 10s"
-                  style={{
-                    width: '38px',
-                    height: '38px',
-                    borderRadius: '50%',
-                    backgroundColor: 'rgba(15, 23, 42, 0.7)',
-                    backdropFilter: 'blur(8px)',
-                    border: '1px solid rgba(255, 255, 255, 0.2)',
-                    color: '#FFFFFF',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: 'pointer',
-                    transition: 'transform 0.15s ease'
-                  }}
-                >
-                  <RotateCw size={16} color="#FFFFFF" />
-                  <span style={{ fontSize: '7px', fontWeight: '900', color: '#38BDF8' }}>10</span>
-                </button>
-              </div>
-
-              {/* BOTTOM CONTROLS OVERLAY (Scrubber & Actions with Auto-Fade) */}
-              <div
-                style={{
-                  position: 'absolute',
-                  bottom: 0,
-                  left: 0,
-                  right: 0,
-                  padding: '10px 14px 12px 14px',
-                  background: 'linear-gradient(0deg, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.55) 70%, rgba(0,0,0,0) 100%)',
-                  opacity: showControls ? 1 : 0,
-                  transition: 'opacity 0.3s ease',
-                  pointerEvents: showControls ? 'auto' : 'none',
-                  zIndex: 25
-                }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                {/* Timeline Scrubber */}
-                <div
-                  onClick={handleScrubberClick}
-                  style={{
-                    position: 'relative',
-                    width: '100%',
-                    height: '14px',
-                    cursor: isHost ? 'pointer' : 'default',
-                    display: 'flex',
-                    alignItems: 'center',
-                    marginBottom: '6px'
-                  }}
-                >
-                  {/* Rail */}
-                  <div
-                    style={{
-                      width: '100%',
-                      height: '3px',
-                      backgroundColor: 'rgba(255, 255, 255, 0.25)',
-                      borderRadius: '2px',
-                      position: 'relative',
-                      overflow: 'hidden'
-                    }}
-                  >
-                    {/* Progress Fill */}
-                    <div
-                      style={{
-                        width: `${progressPercent}%`,
-                        height: '100%',
-                        backgroundColor: '#38BDF8',
-                        boxShadow: '0 0 8px #38BDF8',
-                        transition: 'width 0.1s linear'
-                      }}
-                    />
-                  </div>
-
-                  {/* Scrubber Thumb */}
-                  <div
-                    style={{
-                      position: 'absolute',
-                      left: `calc(${progressPercent}% - 5px)`,
-                      width: '10px',
-                      height: '10px',
-                      borderRadius: '50%',
-                      backgroundColor: '#38BDF8',
-                      boxShadow: '0 0 6px rgba(56, 189, 248, 0.8)',
-                      transition: 'left 0.1s linear'
-                    }}
-                  />
-                </div>
-
-                {/* Bottom Controls Row */}
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: '10px'
-                  }}
-                >
-                  {/* Left Controls: Play/Pause, 10s Back, 10s Next, Volume, Timecode */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <button
-                      onClick={togglePlay}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        color: '#FFF',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        padding: 0
-                      }}
-                    >
-                      {isPlaying ? <Pause size={16} color="#FFF" /> : <Play size={16} color="#FFF" />}
-                    </button>
-
-                    <button
-                      onClick={() => handleSeekJump(-10)}
-                      title="10s Back"
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        color: '#94A3B8',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        padding: 0
-                      }}
-                    >
-                      <RotateCcw size={14} color="#CBD5E1" />
-                    </button>
-
-                    <button
-                      onClick={() => handleSeekJump(10)}
-                      title="10s Forward"
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        color: '#94A3B8',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        padding: 0
-                      }}
-                    >
-                      <RotateCw size={14} color="#CBD5E1" />
-                    </button>
-
-                    {/* Mute / Volume */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <button
-                        onClick={toggleMute}
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          color: '#FFF',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          padding: 0
-                        }}
-                      >
-                        {isMuted || volume === 0 ? (
-                          <VolumeX size={16} color="#EF4444" />
-                        ) : (
-                          <Volume2 size={16} color="#CBD5E1" />
-                        )}
-                      </button>
-
-                      <input
-                        type="range"
-                        min="0"
-                        max="1"
-                        step="0.05"
-                        value={isMuted ? 0 : volume}
-                        onChange={handleVolumeChange}
-                        style={{
-                          width: '50px',
-                          height: '3px',
-                          accentColor: '#38BDF8',
-                          cursor: 'pointer'
-                        }}
-                      />
-                    </div>
-
-                    {/* Timecode */}
-                    <span style={{ color: '#E2E8F0', fontSize: '11px', fontWeight: '700', letterSpacing: '0.5px' }}>
-                      {formatTime(currentTime)} <span style={{ color: '#64748B' }}>/</span> {formatTime(duration)}
-                    </span>
-                  </div>
-
-                  {/* Right Controls: Boost badge & Fullscreen */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <button
-                      onClick={() => setAudioBoost(!audioBoost)}
-                      title="Earbud Audio Boost"
-                      style={{
-                        backgroundColor: audioBoost ? 'rgba(56, 189, 248, 0.25)' : 'rgba(255, 255, 255, 0.1)',
-                        border: audioBoost ? '1px solid #38BDF8' : '1px solid rgba(255, 255, 255, 0.15)',
-                        color: audioBoost ? '#38BDF8' : '#94A3B8',
-                        padding: '3px 6px',
-                        borderRadius: '6px',
-                        fontSize: '9px',
-                        fontWeight: '800',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '3px'
-                      }}
-                    >
-                      <Zap size={10} color={audioBoost ? '#38BDF8' : '#94A3B8'} />
-                      <span>BOOST</span>
-                    </button>
-
-                    <button
-                      onClick={toggleFullscreen}
-                      title="Fullscreen"
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        color: '#FFF',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        padding: 0
-                      }}
-                    >
-                      {isFullscreen ? <Minimize size={16} color="#FFF" /> : <Maximize size={16} color="#FFF" />}
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Playback Error Alert */}
-              {playbackError ? (
-                <div
-                  onClick={togglePlay}
-                  style={{
-                    position: 'absolute',
-                    bottom: '60px',
-                    left: '50%',
-                    transform: 'translateX(-50%)',
-                    backgroundColor: 'rgba(239, 68, 68, 0.95)',
-                    padding: '6px 14px',
-                    borderRadius: '20px',
-                    color: '#FFF',
-                    fontSize: '11px',
-                    fontWeight: '800',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    boxShadow: '0 4px 15px rgba(0,0,0,0.5)',
-                    cursor: 'pointer',
-                    zIndex: 40
-                  }}
-                >
-                  <AlertCircle size={13} color="#FFF" />
-                  <span>{playbackError}</span>
-                </div>
-              ) : null}
-            </div>
-          ) : (
-            /* Silent Disco / Audio Mode Stage with Dancing Equalizer */
-            <div
-              style={{
-                width: '100%',
-                padding: '24px 16px',
-                backgroundColor: '#0F172A',
-                borderRadius: '16px',
-                border: '1px solid rgba(239, 68, 68, 0.2)',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                boxShadow: '0 16px 32px -10px rgba(239, 68, 68, 0.15)'
-              }}
-            >
+                  <Zap size={11} color={audioBoost ? '#38BDF8' : '#94A3B8'} />
+                  <Text style={[styles.boostText, audioBoost && { color: '#38BDF8' }]}>BOOST</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        ) : (
+          /* AUDIO / SILENT DISCO MODE */
+          <View style={styles.audioStage}>
+            {Platform.OS === 'web' && (
               <audio
                 ref={audioRef}
                 src={media.url}
@@ -808,92 +427,41 @@ export const SyncedPlayer: React.FC<Props> = ({
                   }
                 }}
               />
+            )}
 
-              {/* Pulsing DJ Disc */}
-              <div
-                style={{
-                  width: '56px',
-                  height: '56px',
-                  borderRadius: '50%',
-                  backgroundColor: 'rgba(239, 68, 68, 0.15)',
-                  border: '2px solid rgba(239, 68, 68, 0.4)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  marginBottom: '12px',
-                  boxShadow: isPlaying ? '0 0 25px rgba(239, 68, 68, 0.4)' : 'none'
-                }}
-              >
-                <Radio size={26} color="#EF4444" />
-              </div>
+            {/* Glowing DJ Radio Disc */}
+            <View style={[styles.djDisc, isPlaying && styles.djDiscActive]}>
+              <Radio size={28} color="#EF4444" />
+            </View>
 
-              {/* Track Title */}
-              <h3 style={{ color: '#FFFFFF', fontSize: '14px', fontWeight: '800', margin: '0 0 4px 0', textAlign: 'center' }}>
-                {media.title}
-              </h3>
-              <span style={{ color: '#94A3B8', fontSize: '11px', marginBottom: '14px' }}>
-                Earbud Synchronized Broadcast • {formatTime(currentTime)} / {formatTime(duration)}
-              </span>
+            <Text style={styles.audioTitle}>{media.title || 'Silent Disco Track'}</Text>
+            <Text style={styles.audioSubtitle}>
+              Earbud Synchronized Broadcast • {formatTime(currentTime)} / {formatTime(duration)}
+            </Text>
 
-              {/* Audio Controls */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                <button
-                  onClick={() => handleSeekJump(-10)}
-                  style={{
-                    backgroundColor: '#1E293B',
-                    border: '1px solid rgba(255,255,255,0.1)',
-                    borderRadius: '50%',
-                    width: '36px',
-                    height: '36px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: 'pointer'
-                  }}
-                >
-                  <RotateCcw size={15} color="#CBD5E1" />
-                </button>
+            {/* Audio Scrubber Rail */}
+            <View style={styles.audioScrubberRail}>
+              <View style={[styles.audioScrubberProgress, { width: `${progressPercent}%` }]} />
+            </View>
 
-                <button
-                  onClick={togglePlay}
-                  style={{
-                    backgroundColor: '#EF4444',
-                    border: 'none',
-                    borderRadius: '50%',
-                    width: '48px',
-                    height: '48px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: 'pointer',
-                    boxShadow: '0 0 16px rgba(239, 68, 68, 0.4)'
-                  }}
-                >
-                  {isPlaying ? <Pause size={20} color="#090A0F" fill="#090A0F" /> : <Play size={20} color="#090A0F" fill="#090A0F" style={{ marginLeft: 2 }} />}
-                </button>
+            {/* Audio Buttons */}
+            <View style={styles.audioControlsRow}>
+              <TouchableOpacity onPress={() => handleSeekJump(-10)} style={styles.audioRoundBtn}>
+                <RotateCcw size={16} color="#CBD5E1" />
+              </TouchableOpacity>
 
-                <button
-                  onClick={() => handleSeekJump(10)}
-                  style={{
-                    backgroundColor: '#1E293B',
-                    border: '1px solid rgba(255,255,255,0.1)',
-                    borderRadius: '50%',
-                    width: '36px',
-                    height: '36px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: 'pointer'
-                  }}
-                >
-                  <RotateCw size={15} color="#CBD5E1" />
-                </button>
-              </div>
-            </div>
-          )
-        ) : (
-          <View style={styles.nativePlaceholder}>
-            <Text style={{ color: '#FFF' }}>Media Player</Text>
+              <TouchableOpacity onPress={togglePlay} style={styles.audioPlayBtn}>
+                {isPlaying ? (
+                  <Pause size={22} color="#090A0F" fill="#090A0F" />
+                ) : (
+                  <Play size={22} color="#090A0F" fill="#090A0F" style={{ marginLeft: 2 }} />
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity onPress={() => handleSeekJump(10)} style={styles.audioRoundBtn}>
+                <RotateCw size={16} color="#CBD5E1" />
+              </TouchableOpacity>
+            </View>
           </View>
         )}
       </View>
@@ -909,11 +477,212 @@ const styles = StyleSheet.create({
     width: '100%',
     borderRadius: 16,
     overflow: 'hidden',
+    backgroundColor: '#000000',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
   },
-  nativePlaceholder: {
+  videoWrapper: {
     width: '100%',
     aspectRatio: 16 / 9,
-    backgroundColor: '#020617',
+    position: 'relative',
+    backgroundColor: '#000',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  nativeVideo: {
+    width: '100%',
+    height: '100%',
+  },
+  topOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    padding: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    zIndex: 20,
+  },
+  mediaTitle: {
+    color: '#FFF',
+    fontSize: 12,
+    fontWeight: '800',
+    flex: 1,
+    marginRight: 8,
+  },
+  mediaTitleText: {
+    color: '#FFF',
+    fontSize: 13,
+    fontWeight: '800',
+    marginTop: 8,
+  },
+  lockBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: 'rgba(15, 23, 42, 0.85)',
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+  },
+  lockDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#10B981',
+  },
+  lockText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#CBD5E1',
+  },
+  skipBadge: {
+    position: 'absolute',
+    top: '50%',
+    transform: [{ translateY: -15 }],
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    zIndex: 25,
+  },
+  skipText: {
+    color: '#38BDF8',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  bottomControlsBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    zIndex: 20,
+  },
+  scrubberRail: {
+    width: '100%',
+    height: 3,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    borderRadius: 2,
+    marginBottom: 6,
+    overflow: 'hidden',
+  },
+  scrubberProgress: {
+    height: '100%',
+    backgroundColor: '#38BDF8',
+  },
+  controlsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  controlsLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  iconBtn: {
+    padding: 2,
+  },
+  timecodeText: {
+    color: '#E2E8F0',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  boostBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    paddingVertical: 3,
+    paddingHorizontal: 6,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+  },
+  boostBadgeActive: {
+    backgroundColor: 'rgba(56, 189, 248, 0.25)',
+    borderColor: '#38BDF8',
+  },
+  boostText: {
+    color: '#94A3B8',
+    fontSize: 9,
+    fontWeight: '800',
+  },
+  audioStage: {
+    width: '100%',
+    padding: 20,
+    backgroundColor: '#0F172A',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  djDisc: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: 'rgba(239, 68, 68, 0.15)',
+    borderWidth: 2,
+    borderColor: 'rgba(239, 68, 68, 0.4)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
+  },
+  djDiscActive: {
+    borderColor: '#EF4444',
+  },
+  audioTitle: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '800',
+    marginBottom: 3,
+    textAlign: 'center',
+  },
+  audioSubtitle: {
+    color: '#94A3B8',
+    fontSize: 11,
+    marginBottom: 12,
+  },
+  audioScrubberRail: {
+    width: '90%',
+    height: 3,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderRadius: 2,
+    marginBottom: 14,
+    overflow: 'hidden',
+  },
+  audioScrubberProgress: {
+    height: '100%',
+    backgroundColor: '#EF4444',
+  },
+  audioControlsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  audioRoundBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#1E293B',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  audioPlayBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#EF4444',
     alignItems: 'center',
     justifyContent: 'center',
   },

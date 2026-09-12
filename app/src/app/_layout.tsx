@@ -1,14 +1,29 @@
+import React, { useEffect } from 'react';
+import { Platform } from 'react-native';
 import { DarkTheme, ThemeProvider } from 'expo-router';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import * as NavigationBar from 'expo-navigation-bar';
 import "../global.css";
 
 export default function RootLayout() {
+  useEffect(() => {
+    if (Platform.OS === 'android') {
+      try {
+        NavigationBar.setVisibilityAsync('hidden');
+        NavigationBar.setBehaviorAsync('overlay-swipe');
+        NavigationBar.setBackgroundColorAsync('#050814');
+      } catch (e) {
+        console.log('NavigationBar immersive init:', e);
+      }
+    }
+  }, []);
+
   return (
     <SafeAreaProvider>
       <ThemeProvider value={DarkTheme}>
-        <StatusBar style="light" translucent={true} backgroundColor="#050814" />
+        <StatusBar hidden={false} translucent={true} style="light" backgroundColor="transparent" />
         <Stack
           screenOptions={{
             headerShown: false,
@@ -31,3 +46,4 @@ export default function RootLayout() {
     </SafeAreaProvider>
   );
 }
+

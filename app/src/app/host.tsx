@@ -278,8 +278,8 @@ export default function HostScreen() {
           contentContainerStyle={[
             styles.container,
             {
-              paddingTop: Math.max(insets.top + 8, 36),
-              paddingBottom: Math.max(insets.bottom + 60, 80)
+              paddingTop: Math.max(insets.top + 6, 16),
+              paddingBottom: Math.max(insets.bottom + 40, 50)
             }
           ]}
           showsVerticalScrollIndicator={false}
@@ -561,8 +561,8 @@ export default function HostScreen() {
         contentContainerStyle={[
           styles.container,
           {
-            paddingTop: Math.max(insets.top + 8, 36),
-            paddingBottom: Math.max(insets.bottom + 60, 80)
+            paddingTop: Math.max(insets.top + 6, 16),
+            paddingBottom: Math.max(insets.bottom + 40, 50)
           }
         ]}
         showsVerticalScrollIndicator={false}

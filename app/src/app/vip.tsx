@@ -127,8 +127,8 @@ export default function VipRedemptionScreen() {
         contentContainerStyle={[
           styles.scrollContent,
           {
-            paddingTop: Math.max(insets.top + 8, 36),
-            paddingBottom: Math.max(insets.bottom + 80, 100)
+            paddingTop: Math.max(insets.top + 6, 16),
+            paddingBottom: Math.max(insets.bottom + 65, 80)
           }
         ]}
         showsVerticalScrollIndicator={false}

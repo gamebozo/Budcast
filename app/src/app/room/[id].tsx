@@ -196,8 +196,8 @@ export default function GuestRoomScreen() {
           contentContainerStyle={[
             styles.container,
             {
-              paddingTop: Math.max(insets.top + 8, 36),
-              paddingBottom: Math.max(insets.bottom + 40, 60)
+              paddingTop: Math.max(insets.top + 6, 16),
+              paddingBottom: Math.max(insets.bottom + 30, 40)
             }
           ]}
           showsVerticalScrollIndicator={false}

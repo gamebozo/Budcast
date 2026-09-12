@@ -11,6 +11,7 @@ import { FloatingNavBar } from '../components/FloatingNavBar';
 import { BudcastLogo } from '../components/BudcastLogo';
 import { syncEngine } from '../services/syncEngine';
 import { getActivePlan } from '../services/hostStorage';
+import { playSyncAlignmentBeep } from '../services/soundEffects';
 
 const EARBUD_PRESETS = [
   { name: 'AirPods Pro / Max', offset: 70, brand: 'Apple AAC' },
@@ -41,26 +42,14 @@ export default function SettingsScreen() {
     }, 1200);
   };
 
-  const playTestBeep = () => {
+  const playTestBeep = async () => {
     setIsPlayingTestTone(true);
-    if (Platform.OS === 'web' && window.AudioContext) {
-      try {
-        const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(880, ctx.currentTime);
-        gain.gain.setValueAtTime(0.3, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start();
-        osc.stop(ctx.currentTime + 0.3);
-      } catch (e) {
-        console.log('Audio test error:', e);
-      }
+    try {
+      await playSyncAlignmentBeep();
+    } catch (e) {
+      console.log('Beep error:', e);
     }
-    setTimeout(() => setIsPlayingTestTone(false), 300);
+    setTimeout(() => setIsPlayingTestTone(false), 350);
   };
 
   return (
@@ -69,8 +58,8 @@ export default function SettingsScreen() {
         contentContainerStyle={[
           styles.container,
           {
-            paddingTop: Math.max(insets.top + 8, 36),
-            paddingBottom: Math.max(insets.bottom + 80, 100)
+            paddingTop: Math.max(insets.top + 6, 16),
+            paddingBottom: Math.max(insets.bottom + 65, 80)
           }
         ]}
         showsVerticalScrollIndicator={false}

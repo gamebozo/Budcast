@@ -66,8 +66,8 @@ export default function HomeScreen() {
         contentContainerStyle={[
           styles.container,
           {
-            paddingTop: Math.max(insets.top + 8, 36),
-            paddingBottom: Math.max(insets.bottom + 90, 110)
+            paddingTop: Math.max(insets.top + 6, 16),
+            paddingBottom: Math.max(insets.bottom + 65, 80)
           }
         ]}
         showsVerticalScrollIndicator={false}
