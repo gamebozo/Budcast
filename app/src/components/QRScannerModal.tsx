@@ -391,8 +391,6 @@ export function QRScannerModal({ visible, onClose, onScannedPin }: QRScannerModa
                 maxLength={4}
                 value={pin}
                 autoFocus
-                includeFontPadding={false}
-                textAlignVertical="center"
                 onChangeText={(val) => {
                   setPin(val);
                   if (error) setError('');

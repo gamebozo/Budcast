@@ -332,7 +332,7 @@ app.post('/api/payment/verify', paymentLimiter, async (req, res) => {
     res.json(verificationResult);
   } catch (err) {
     console.error('[Payment Verify Error]:', err.message);
-    res.status(400).json({ error: 'Payment signature verification failed. Unauthorized.' });
+    res.status(400).json({ error: err.message || 'Payment verification failed' });
   }
 });
 
@@ -360,6 +360,127 @@ app.get('/api/payment/history', async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch payment history' });
   }
+});
+
+// 6. Hosted Mobile & Web Razorpay Checkout Page
+app.get('/checkout', (req, res) => {
+  const { orderId, planId, planName, amount, billingCycle, hostId } = req.query;
+  const keyId = process.env.RAZORPAY_KEY_ID || 'rzp_live_TYztip7UZ116H1';
+
+  function escapeHtml(str) {
+    if (!str) return '';
+    return String(str).replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+  }
+  
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Budcast Checkout</title>
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; padding: 20px;
+      background: #090A0F; color: #FFFFFF;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      display: flex; align-items: center; justify-content: center; min-height: 100vh;
+    }
+    .card {
+      background: #0F172A; border-radius: 24px; padding: 28px;
+      border: 1px solid rgba(255, 255, 255, 0.1); width: 100%; max-width: 400px;
+      text-align: center; box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+    }
+    .badge {
+      display: inline-block; background: rgba(56, 189, 248, 0.15);
+      color: #38BDF8; padding: 4px 12px; border-radius: 20px;
+      font-size: 11px; font-weight: 800; margin-bottom: 12px;
+      border: 1px solid rgba(56, 189, 248, 0.3);
+    }
+    h2 { margin: 0 0 6px 0; font-size: 22px; font-weight: 900; }
+    .price { font-size: 32px; font-weight: 900; color: #38BDF8; margin: 16px 0; }
+    .btn {
+      width: 100%; padding: 16px; border-radius: 14px;
+      background: #38BDF8; color: #090A0F; font-size: 15px; font-weight: 900;
+      border: none; cursor: pointer; transition: transform 0.1s; margin-top: 10px;
+    }
+    .btn:active { transform: scale(0.98); }
+    .status { margin-top: 16px; font-size: 13px; color: #94A3B8; }
+  </style>
+</head>
+<body>
+  <div class="card" id="mainCard">
+    <div class="badge">SECURE RAZORPAY CHECKOUT</div>
+    <h2>${escapeHtml(planName || 'Budcast Upgrade')}</h2>
+    <div class="price">₹${Math.round((Number(amount) || 79900) / 100)}</div>
+    <p style="color:#94A3B8; font-size:12px; margin:0 0 16px 0;">${escapeHtml((billingCycle || 'yearly')).toUpperCase()} BILLING • INSTANT ACTIVATION</p>
+    
+    <button class="btn" id="payBtn" onclick="launchCheckout()">Pay with UPI / Card / QR</button>
+    <div class="status" id="statusText">Tap above if payment window does not open automatically.</div>
+  </div>
+
+  <script>
+    function launchCheckout() {
+      const options = {
+        key: '${keyId}',
+        amount: '${amount || 79900}',
+        currency: 'INR',
+        name: 'Budcast',
+        description: '${escapeHtml(planName || 'Pro Plan')} Subscription',
+        order_id: '${orderId || ''}',
+        handler: async function(response) {
+          document.getElementById('statusText').innerText = 'Verifying payment with Budcast server...';
+          try {
+            const res = await fetch('/api/payment/verify', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                orderId: response.razorpay_order_id || '${orderId}',
+                paymentId: response.razorpay_payment_id,
+                signature: response.razorpay_signature,
+                hostId: '${hostId || 'default-host'}',
+                planId: '${planId || 'pro'}',
+                billingCycle: '${billingCycle || 'yearly'}'
+              })
+            });
+            const data = await res.json();
+            if (res.ok) {
+              document.getElementById('mainCard').innerHTML = '<h2 style="color:#10B981;">🎉 Payment Verified!</h2><p style="color:#CBD5E1; margin: 12px 0 20px 0;">Your plan is now active!</p><button class="btn" style="background:#10B981; color:#FFF;" onclick="finishAndClose()">Return to App</button>';
+              setTimeout(finishAndClose, 1800);
+            } else {
+              document.getElementById('statusText').innerText = data.error || 'Verification failed. Please retry.';
+            }
+          } catch (e) {
+            document.getElementById('statusText').innerText = 'Network error verifying payment.';
+          }
+        },
+        prefill: { name: 'Budcast User', email: 'host@budcast.live', contact: '9999999999' },
+        theme: { color: '#38BDF8' },
+        modal: {
+          ondismiss: function() {
+            document.getElementById('statusText').innerText = 'Payment window was closed.';
+          }
+        }
+      };
+
+      if (window.Razorpay) {
+        const rzp = new Razorpay(options);
+        rzp.open();
+      }
+    }
+
+    function finishAndClose() {
+      window.location.href = 'budcast://payment-success?planId=${planId || 'pro'}&status=success';
+    }
+
+    window.onload = function() {
+      setTimeout(launchCheckout, 400);
+    };
+  </script>
+</body>
+</html>`;
+  res.send(html);
 });
 
 // ==========================================

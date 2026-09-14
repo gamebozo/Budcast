@@ -11,9 +11,9 @@ export default function RootLayout() {
   useEffect(() => {
     if (Platform.OS === 'android') {
       try {
-        NavigationBar.setVisibilityAsync('hidden');
-        NavigationBar.setBehaviorAsync('overlay-swipe');
-        NavigationBar.setBackgroundColorAsync('#050814');
+        (NavigationBar as any).setVisibilityAsync?.('hidden');
+        (NavigationBar as any).setBehaviorAsync?.('overlay-swipe');
+        (NavigationBar as any).setBackgroundColorAsync?.('#050814');
       } catch (e) {
         console.log('NavigationBar immersive init:', e);
       }
@@ -23,7 +23,7 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <ThemeProvider value={DarkTheme}>
-        <StatusBar hidden={false} translucent={true} style="light" backgroundColor="transparent" />
+        <StatusBar style="light" />
         <Stack
           screenOptions={{
             headerShown: false,

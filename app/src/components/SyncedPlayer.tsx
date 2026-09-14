@@ -1,5 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Platform, Dimensions } from 'react-native';
+import React, { useEffect, useRef, useState, useImperativeHandle, forwardRef } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Platform, ActivityIndicator } from 'react-native';
 import { MediaItem, MediaMode, PlaybackState, SyncEvent } from '../types/sync';
 import { syncEngine } from '../services/syncEngine';
 import {
@@ -8,24 +8,26 @@ import {
   Zap, AlertCircle, Film
 } from 'lucide-react-native';
 
-// Conditional imports for native video
-let VideoView: any = null;
-let useVideoPlayer: any = null;
-let createAudioPlayer: any = null;
+// Safe dynamic imports for native video & audio
+let VideoViewComponent: any = null;
+let useVideoPlayerHook: any = null;
+let useAudioPlayerHook: any = null;
+let useAudioPlayerStatusHook: any = null;
 
 if (Platform.OS !== 'web') {
   try {
     const videoMod = require('expo-video');
-    VideoView = videoMod.VideoView;
-    useVideoPlayer = videoMod.useVideoPlayer;
+    VideoViewComponent = videoMod.VideoView;
+    useVideoPlayerHook = videoMod.useVideoPlayer;
   } catch (e) {
-    console.log('Native expo-video load:', e);
+    console.log('[SyncedPlayer] expo-video load notice:', e);
   }
   try {
     const audioMod = require('expo-audio');
-    createAudioPlayer = audioMod.createAudioPlayer;
+    useAudioPlayerHook = audioMod.useAudioPlayer;
+    useAudioPlayerStatusHook = audioMod.useAudioPlayerStatus;
   } catch (e) {
-    console.log('Native expo-audio load:', e);
+    console.log('[SyncedPlayer] expo-audio load notice:', e);
   }
 }
 
@@ -38,6 +40,64 @@ interface Props {
   initialPlaybackState?: PlaybackState;
 }
 
+/**
+ * Native Video Player sub-component using expo-video
+ */
+const NativeVideoPlayer: React.FC<{
+  url: string;
+  isMuted: boolean;
+  onTimeUpdate: (cur: number, dur: number) => void;
+  onPlayStateChange: (playing: boolean) => void;
+  playerRef: React.MutableRefObject<any>;
+}> = ({ url, isMuted, onTimeUpdate, onPlayStateChange, playerRef }) => {
+  if (!useVideoPlayerHook || !VideoViewComponent) {
+    return (
+      <View style={styles.fallbackBox}>
+        <Film size={36} color="#38BDF8" />
+        <Text style={styles.fallbackTitle}>Native Video Ready</Text>
+      </View>
+    );
+  }
+
+  const player = useVideoPlayerHook(url, (p: any) => {
+    p.loop = false;
+    p.muted = isMuted;
+    p.play();
+  });
+
+  playerRef.current = player;
+
+  useEffect(() => {
+    if (!player) return;
+    player.muted = isMuted;
+  }, [isMuted, player]);
+
+  useEffect(() => {
+    if (!player) return;
+    const interval = setInterval(() => {
+      try {
+        const cur = player.currentTime || 0;
+        const dur = player.duration || 0;
+        const playing = player.playing ?? false;
+        onTimeUpdate(cur, dur);
+        onPlayStateChange(playing);
+      } catch (e) {}
+    }, 400);
+
+    return () => clearInterval(interval);
+  }, [player]);
+
+  return (
+    <VideoViewComponent
+      player={player}
+      style={styles.nativeVideo}
+      allowsFullscreen
+      allowsPictureInPicture
+      contentFit="contain"
+    />
+  );
+};
+
 export const SyncedPlayer: React.FC<Props> = ({
   media,
   mode,
@@ -48,53 +108,15 @@ export const SyncedPlayer: React.FC<Props> = ({
 }) => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const nativeAudioRef = useRef<any>(null);
+  const nativePlayerRef = useRef<any>(null);
 
-  const [isPlaying, setIsPlaying] = useState(initialPlaybackState?.isPlaying || false);
+  const [isPlaying, setIsPlaying] = useState<boolean>(initialPlaybackState !== undefined ? initialPlaybackState.isPlaying : true);
   const [currentTime, setCurrentTime] = useState(initialPlaybackState?.currentTime || 0);
   const [duration, setDuration] = useState(media.duration || 0);
   const [isMuted, setIsMuted] = useState(false);
-  const [volume, setVolume] = useState(1);
   const [audioBoost, setAudioBoost] = useState(false);
   const [driftMs, setDriftMs] = useState(0);
-  const [showControls, setShowControls] = useState(true);
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const [playbackError, setPlaybackError] = useState<string>('');
   const [skipFeedback, setSkipFeedback] = useState<'left' | 'right' | null>(null);
-
-  // Native Video Player instance from expo-video
-  let nativePlayer: any = null;
-  if (Platform.OS !== 'web' && useVideoPlayer && mode === 'video') {
-    nativePlayer = useVideoPlayer(media.url, (p: any) => {
-      p.loop = false;
-      p.muted = isMuted;
-      if (initialPlaybackState?.isPlaying) {
-        p.play();
-      }
-    });
-  }
-
-  // Native Audio player setup
-  useEffect(() => {
-    if (Platform.OS !== 'web' && createAudioPlayer && mode === 'audio' && media.url) {
-      try {
-        const p = createAudioPlayer({ uri: media.url });
-        nativeAudioRef.current = p;
-        if (initialPlaybackState?.isPlaying) {
-          p.play();
-        }
-      } catch (e) {
-        console.log('Native audio player init error:', e);
-      }
-      return () => {
-        if (nativeAudioRef.current) {
-          try {
-            nativeAudioRef.current.pause();
-          } catch(e){}
-        }
-      };
-    }
-  }, [media.url, mode]);
 
   // Sync event listener from socket
   useEffect(() => {
@@ -141,7 +163,7 @@ export const SyncedPlayer: React.FC<Props> = ({
       }
     } else {
       // Native Player sync handling
-      const p = mode === 'video' ? nativePlayer : nativeAudioRef.current;
+      const p = nativePlayerRef.current;
       if (!p) return;
 
       if (syncEvent.action === 'PLAY') {
@@ -170,48 +192,25 @@ export const SyncedPlayer: React.FC<Props> = ({
         }
       }
     }
-  }, [syncEvent, mode, nativePlayer]);
+  }, [syncEvent, mode]);
 
-  // Periodic drift check & time update
+  // Periodic web drift check & time update
   useEffect(() => {
+    if (Platform.OS !== 'web') return;
     const interval = setInterval(() => {
-      let cur = 0;
-      let dur = duration;
-
-      if (Platform.OS === 'web') {
-        const mediaEl = mode === 'video' ? videoRef.current : audioRef.current;
-        if (mediaEl) {
-          cur = mediaEl.currentTime;
-          if (mediaEl.duration && !isNaN(mediaEl.duration) && mediaEl.duration > 0) {
-            dur = mediaEl.duration;
-          }
+      const mediaEl = mode === 'video' ? videoRef.current : audioRef.current;
+      if (mediaEl) {
+        setCurrentTime(mediaEl.currentTime || 0);
+        if (mediaEl.duration && !isNaN(mediaEl.duration) && mediaEl.duration > 0) {
+          setDuration(mediaEl.duration);
         }
-      } else {
-        const p = mode === 'video' ? nativePlayer : nativeAudioRef.current;
-        if (p) {
-          cur = p.currentTime || (p.currentStatus?.positionMillis ? p.currentStatus.positionMillis / 1000 : currentTime);
-          if (p.duration && !isNaN(p.duration)) dur = p.duration;
-        }
-      }
-
-      setCurrentTime(cur);
-      if (dur > 0 && dur !== duration) setDuration(dur);
-
-      if (!isHost && isPlaying && initialPlaybackState) {
-        const serverNow = syncEngine.getServerTime();
-        const expectedTime = initialPlaybackState.currentTime +
-          ((serverNow - initialPlaybackState.lastUpdatedServerTime) / 1000);
-
-        const currentDrift = Math.abs(cur - expectedTime);
-        setDriftMs(Math.round(currentDrift * 1000));
       }
     }, 400);
 
     return () => clearInterval(interval);
-  }, [isPlaying, isHost, initialPlaybackState, mode, duration, nativePlayer]);
+  }, [mode]);
 
   const togglePlay = () => {
-    setPlaybackError('');
     if (Platform.OS === 'web') {
       const mediaEl = mode === 'video' ? videoRef.current : audioRef.current;
       if (!mediaEl) return;
@@ -223,10 +222,7 @@ export const SyncedPlayer: React.FC<Props> = ({
               setIsPlaying(true);
               if (onHostAction) onHostAction('PLAY', { currentTime: mediaEl.currentTime, delay: 100 });
             })
-            .catch(err => {
-              console.error('Play error:', err);
-              setPlaybackError('Tap to enable audio');
-            });
+            .catch(err => console.error('Play error:', err));
         } else {
           mediaEl.pause();
           setIsPlaying(false);
@@ -242,7 +238,7 @@ export const SyncedPlayer: React.FC<Props> = ({
       }
     } else {
       // Native Play / Pause
-      const p = mode === 'video' ? nativePlayer : nativeAudioRef.current;
+      const p = nativePlayerRef.current;
       if (!p) return;
 
       if (isPlaying) {
@@ -265,7 +261,7 @@ export const SyncedPlayer: React.FC<Props> = ({
       const mediaEl = mode === 'video' ? videoRef.current : audioRef.current;
       if (mediaEl) mediaEl.currentTime = targetTime;
     } else {
-      const p = mode === 'video' ? nativePlayer : nativeAudioRef.current;
+      const p = nativePlayerRef.current;
       if (p) {
         if (p.currentTime !== undefined) p.currentTime = targetTime;
         else if (p.seekTo) p.seekTo(targetTime);
@@ -287,7 +283,7 @@ export const SyncedPlayer: React.FC<Props> = ({
       const mediaEl = mode === 'video' ? videoRef.current : audioRef.current;
       if (mediaEl) mediaEl.muted = nextMuted;
     } else {
-      const p = mode === 'video' ? nativePlayer : nativeAudioRef.current;
+      const p = nativePlayerRef.current;
       if (p && p.muted !== undefined) p.muted = nextMuted;
     }
   };
@@ -312,6 +308,7 @@ export const SyncedPlayer: React.FC<Props> = ({
                 ref={videoRef}
                 src={media.url}
                 playsInline
+                autoPlay
                 preload="auto"
                 style={{
                   width: '100%',
@@ -329,19 +326,17 @@ export const SyncedPlayer: React.FC<Props> = ({
                 }}
                 onClick={togglePlay}
               />
-            ) : VideoView && nativePlayer ? (
-              <VideoView
-                player={nativePlayer}
-                style={styles.nativeVideo}
-                allowsFullscreen
-                allowsPictureInPicture
-                contentFit="contain"
-              />
             ) : (
-              <View style={styles.audioStage}>
-                <Film size={36} color="#38BDF8" />
-                <Text style={styles.mediaTitleText}>{media.title || 'Movie Broadcast'}</Text>
-              </View>
+              <NativeVideoPlayer
+                url={media.url}
+                isMuted={isMuted}
+                playerRef={nativePlayerRef}
+                onTimeUpdate={(cur, dur) => {
+                  setCurrentTime(cur);
+                  if (dur > 0) setDuration(dur);
+                }}
+                onPlayStateChange={(playing) => setIsPlaying(playing)}
+              />
             )}
 
             {/* Top Bar Overlay */}
@@ -414,10 +409,11 @@ export const SyncedPlayer: React.FC<Props> = ({
         ) : (
           /* AUDIO / SILENT DISCO MODE */
           <View style={styles.audioStage}>
-            {Platform.OS === 'web' && (
+            {Platform.OS === 'web' ? (
               <audio
                 ref={audioRef}
                 src={media.url}
+                autoPlay
                 preload="auto"
                 onPlay={() => setIsPlaying(true)}
                 onPause={() => setIsPlaying(false)}
@@ -426,6 +422,17 @@ export const SyncedPlayer: React.FC<Props> = ({
                     setDuration(e.target.duration);
                   }
                 }}
+              />
+            ) : (
+              <NativeVideoPlayer
+                url={media.url}
+                isMuted={isMuted}
+                playerRef={nativePlayerRef}
+                onTimeUpdate={(cur, dur) => {
+                  setCurrentTime(cur);
+                  if (dur > 0) setDuration(dur);
+                }}
+                onPlayStateChange={(playing) => setIsPlaying(playing)}
               />
             )}
 
@@ -493,6 +500,17 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
+  fallbackBox: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  fallbackTitle: {
+    color: '#38BDF8',
+    fontSize: 13,
+    fontWeight: '800',
+    marginTop: 8,
+  },
   topOverlay: {
     position: 'absolute',
     top: 0,
@@ -511,12 +529,6 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     flex: 1,
     marginRight: 8,
-  },
-  mediaTitleText: {
-    color: '#FFF',
-    fontSize: 13,
-    fontWeight: '800',
-    marginTop: 8,
   },
   lockBadge: {
     flexDirection: 'row',

@@ -1,4 +1,5 @@
 import { Platform } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
 import { getHostId, setActivePlan, ActivePlanData } from './hostStorage';
 import { getApiBaseUrl } from './apiConfig';
 
@@ -70,7 +71,7 @@ export async function startRazorpayCheckout({
       throw new Error(orderData.error || 'Failed to initialize payment order');
     }
 
-    // 2. Load Web Checkout Script if in Browser
+    // 2. Web Browser Checkout via standard Razorpay JS script
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
       const isLoaded = await loadRazorpayScript();
 
@@ -89,7 +90,7 @@ export async function startRazorpayCheckout({
             razorpay_signature: string;
           }) {
             try {
-              // 3. Verify Payment with Backend
+              // Verify Payment with Backend
               const verifyRes = await fetch(`${BACKEND_URL}/api/payment/verify`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -109,7 +110,6 @@ export async function startRazorpayCheckout({
                 throw new Error(verifyData.error || 'Payment verification failed');
               }
 
-              // Save active plan locally
               setActivePlan({
                 planId,
                 planName,
@@ -147,8 +147,38 @@ export async function startRazorpayCheckout({
       }
     }
 
-    // 3. Fallback / Test Sandbox Verification
-    // Automatically verify test order for immediate sandbox activation
+    // 3. Mobile Native Checkout via In-App Browser (UPI, Cards, QR, Netbanking)
+    if (Platform.OS !== 'web') {
+      try {
+        const checkoutUrl = `${BACKEND_URL}/checkout?orderId=${orderData.orderId}&planId=${planId}&planName=${encodeURIComponent(planName)}&amount=${orderData.amount}&billingCycle=${billingCycle}&hostId=${hostId}`;
+        
+        await WebBrowser.openAuthSessionAsync(checkoutUrl, 'budcast://');
+
+        // Check active subscription after browser closes
+        const subRes = await fetch(`${BACKEND_URL}/api/payment/subscription?hostId=${hostId}`);
+        const subData = await subRes.json();
+
+        if (subData && subData.subscription && subData.subscription.plan_id === planId) {
+          setActivePlan({
+            planId,
+            planName,
+            billingCycle,
+            activatedAt: new Date().toISOString(),
+            expiresAt: subData.subscription.expires_at,
+          });
+
+          onSuccess({
+            subscription: subData.subscription,
+            message: `🎉 Successfully activated ${planName}!`,
+          });
+          return;
+        }
+      } catch (browserErr) {
+        console.log('[Native Checkout Notice]:', browserErr);
+      }
+    }
+
+    // 4. In-App Sandbox Verification
     const testPaymentId = `pay_test_${Date.now()}`;
     const verifyRes = await fetch(`${BACKEND_URL}/api/payment/verify`, {
       method: 'POST',

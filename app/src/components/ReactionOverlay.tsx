@@ -4,7 +4,7 @@ import { ReactionItem } from '../types/sync';
 
 interface Props {
   reactions: ReactionItem[];
-  onSendReaction: (emoji: string) => void;
+  onSendReaction?: (emoji: string) => void;
 }
 
 const EMOJIS = ['❤️', '🔥', '👏', '😂', '🎉', '🤯'];
@@ -30,7 +30,7 @@ export const ReactionOverlay: React.FC<Props> = ({ reactions, onSendReaction }) 
           <TouchableOpacity
             key={emoji}
             style={styles.emojiButton}
-            onPress={() => onSendReaction(emoji)}
+            onPress={() => onSendReaction?.(emoji)}
             activeOpacity={0.7}
           >
             <Text style={styles.emojiText}>{emoji}</Text>

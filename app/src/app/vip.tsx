@@ -140,7 +140,7 @@ export default function VipRedemptionScreen() {
             <ArrowLeft color="#94A3B8" size={22} />
           </TouchableOpacity>
           <View style={styles.headerTitleWrap}>
-            <BudcastLogo size="small" showGlow={false} />
+            <BudcastLogo size={24} />
             <Text style={styles.headerTitle}>VIP Pass Redemption</Text>
           </View>
           <View style={{ width: 40 }} />

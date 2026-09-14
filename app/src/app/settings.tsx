@@ -11,7 +11,7 @@ import { FloatingNavBar } from '../components/FloatingNavBar';
 import { BudcastLogo } from '../components/BudcastLogo';
 import { syncEngine } from '../services/syncEngine';
 import { getActivePlan } from '../services/hostStorage';
-import { playSyncAlignmentBeep } from '../services/soundEffects';
+import { playSyncAlignmentBeep, playEqPreviewSound, playEarbudPresetChime } from '../services/soundEffects';
 
 const EARBUD_PRESETS = [
   { name: 'AirPods Pro / Max', offset: 70, brand: 'Apple AAC' },
@@ -32,6 +32,16 @@ export default function SettingsScreen() {
   const [diag, setDiag] = useState(syncEngine.getDiagnostics());
   const [calibrating, setCalibrating] = useState(false);
   const [isPlayingTestTone, setIsPlayingTestTone] = useState(false);
+
+  const handleSelectPreset = (offset: number) => {
+    setEarbudOffset(offset);
+    playEarbudPresetChime(offset);
+  };
+
+  const handleSelectEq = (eq: 'flat' | 'bass' | 'vocal' | 'cinema') => {
+    setSelectedEq(eq);
+    playEqPreviewSound(eq);
+  };
 
   const handleRecalibrate = () => {
     setCalibrating(true);
@@ -110,7 +120,7 @@ export default function SettingsScreen() {
                 <TouchableOpacity
                   key={preset.name}
                   style={[styles.presetRow, isSelected && styles.presetRowActive]}
-                  onPress={() => setEarbudOffset(preset.offset)}
+                  onPress={() => handleSelectPreset(preset.offset)}
                   activeOpacity={0.7}
                 >
                   <View style={{ flex: 1 }}>
@@ -168,7 +178,7 @@ export default function SettingsScreen() {
                 <TouchableOpacity
                   key={item.id}
                   style={[styles.eqCard, isSelected && styles.eqCardActive]}
-                  onPress={() => setSelectedEq(item.id as any)}
+                  onPress={() => handleSelectEq(item.id as any)}
                 >
                   <Text style={[styles.eqTitle, isSelected && { color: '#A855F7' }]}>
                     {item.label}
@@ -211,11 +221,11 @@ export default function SettingsScreen() {
           <View style={styles.diagGrid}>
             <View style={styles.diagItem}>
               <Text style={styles.diagLabel}>CLOCK OFFSET</Text>
-              <Text style={styles.diagValue}>{diag.offset} ms</Text>
+              <Text style={styles.diagValue}>{diag.clockOffset ?? 0} ms</Text>
             </View>
             <View style={styles.diagItem}>
               <Text style={styles.diagLabel}>ROUND TRIP (RTT)</Text>
-              <Text style={styles.diagValue}>{diag.roundTripTime} ms</Text>
+              <Text style={styles.diagValue}>{diag.rtt ?? 0} ms</Text>
             </View>
             <View style={styles.diagItem}>
               <Text style={styles.diagLabel}>STATUS</Text>

@@ -7,23 +7,29 @@ import { BudcastLogo } from './BudcastLogo';
 interface Props {
   visible: boolean;
   onClose: () => void;
-  pin: string;
-  url: string;
-  listenerCount: number;
+  pin?: string;
+  roomId?: string;
+  url?: string;
+  roomUrl?: string;
+  listenerCount?: number;
 }
 
 export const ShareRoomModal: React.FC<Props> = ({
   visible,
   onClose,
   pin,
+  roomId,
   url,
-  listenerCount,
+  roomUrl,
+  listenerCount = 0,
 }) => {
+  const displayPin = pin || roomId || '0000';
+  const displayUrl = url || roomUrl || `https://budcast.live/room/${displayPin}`;
   const [copied, setCopied] = React.useState(false);
 
   const handleCopy = () => {
     if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.clipboard) {
-      navigator.clipboard.writeText(url);
+      navigator.clipboard.writeText(displayUrl);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     }
@@ -55,11 +61,11 @@ export const ShareRoomModal: React.FC<Props> = ({
           {/* QR Code */}
           <View style={styles.qrContainer}>
             {Platform.OS === 'web' ? (
-              <QRCodeSVG value={url} size={180} level="M" />
+              <QRCodeSVG value={displayUrl} size={180} level="M" />
             ) : (
               <View style={styles.qrPlaceholder}>
                 <Text style={styles.qrText}>Room URL:</Text>
-                <Text style={styles.qrUrlText}>{url}</Text>
+                <Text style={styles.qrUrlText}>{displayUrl}</Text>
               </View>
             )}
           </View>
@@ -67,7 +73,7 @@ export const ShareRoomModal: React.FC<Props> = ({
           {/* PIN Display */}
           <View style={styles.pinSection}>
             <Text style={styles.pinLabel}>ROOM 4-DIGIT PIN</Text>
-            <Text style={styles.pinNumber}>{pin}</Text>
+            <Text style={styles.pinNumber}>{displayPin}</Text>
           </View>
 
           {/* Copy Button */}

@@ -8,6 +8,7 @@ export interface MediaItem {
   duration?: number;
   filename?: string;
   mimetype?: string;
+  size?: number;
 }
 
 export interface PlaybackState {

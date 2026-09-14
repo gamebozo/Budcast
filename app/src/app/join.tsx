@@ -383,8 +383,6 @@ export default function JoinScreen() {
               maxLength={4}
               value={pin}
               autoFocus
-              includeFontPadding={false}
-              textAlignVertical="center"
               onChangeText={(val) => {
                 setPin(val);
                 if (error) setError('');

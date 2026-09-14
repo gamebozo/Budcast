@@ -34,6 +34,7 @@ const DISCO_CHANNELS = [
 
 export default function GuestRoomScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
 
   const [loading, setLoading] = useState<boolean>(true);
