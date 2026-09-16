@@ -144,13 +144,21 @@ app.post('/api/contact', apiLimiter, (req, res) => {
   return res.json({ success: true, message: 'Message received. We will respond within 24 hours.' });
 });
 
-// Secure Static Uploads Serving
+// Secure Static Uploads Serving with CORS & HTTP Range Request Support for Smooth Audio Streaming
 app.use('/uploads', (req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Headers', 'Range, Content-Type, Accept');
+  res.setHeader('Access-Control-Expose-Headers', 'Content-Range, Content-Length, Accept-Ranges');
+  res.setHeader('Accept-Ranges', 'bytes');
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('Content-Security-Policy', "default-src 'none'; media-src 'self' http: https: blob: data:;");
   next();
-}, express.static(uploadsDir));
+}, express.static(uploadsDir, {
+  acceptRanges: true,
+  cacheControl: true,
+  maxAge: '1d'
+}));
 
 // Serve official Budcast App Icon for Razorpay modal & external integrations
 app.get(['/app-icon.png', '/assets/icon.png', '/assets/images/icon.png'], (req, res) => {

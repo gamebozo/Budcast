@@ -641,9 +641,15 @@ export const SyncedPlayer: React.FC<Props> = ({
                 ref={audioRef}
                 src={media.url}
                 autoPlay
+                playsInline
                 preload="auto"
+                crossOrigin="anonymous"
                 onPlay={() => setIsPlaying(true)}
                 onPause={() => setIsPlaying(false)}
+                onEnded={() => {
+                  setIsPlaying(false);
+                  if (isHost && onHostAction) onHostAction('PAUSE', { currentTime: duration });
+                }}
                 onLoadedMetadata={(e: any) => {
                   if (e.target.duration && !isNaN(e.target.duration)) {
                     setDuration(e.target.duration);
@@ -686,6 +692,12 @@ export const SyncedPlayer: React.FC<Props> = ({
             >
               <View style={styles.audioScrubberRail}>
                 <View style={[styles.audioScrubberProgress, { width: `${progressPercent}%` }]} />
+                <View
+                  style={[
+                    styles.audioScrubberThumb,
+                    { left: `${Math.max(0, Math.min(98, progressPercent))}%` },
+                  ]}
+                />
               </View>
             </TouchableOpacity>
 
@@ -957,14 +969,25 @@ const styles = StyleSheet.create({
   },
   audioScrubberRail: {
     width: '100%',
-    height: 3,
+    height: 4,
     backgroundColor: 'rgba(255, 255, 255, 0.15)',
     borderRadius: 2,
-    overflow: 'hidden',
+    position: 'relative',
+    justifyContent: 'center',
   },
   audioScrubberProgress: {
     height: '100%',
     backgroundColor: '#EF4444',
+    borderRadius: 2,
+  },
+  audioScrubberThumb: {
+    position: 'absolute',
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#EF4444',
+    top: -3,
+    marginLeft: -5,
   },
   audioControlsRow: {
     flexDirection: 'row',

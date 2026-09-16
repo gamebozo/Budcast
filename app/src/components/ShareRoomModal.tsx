@@ -1,3 +1,4 @@
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Modal, Platform, Share } from 'react-native';
 import { QRCodeSVG } from 'qrcode.react';
 import { X, Copy, Check, Users, Shield, Share2 } from 'lucide-react-native';
@@ -24,7 +25,7 @@ export const ShareRoomModal: React.FC<Props> = ({
 }) => {
   const displayPin = pin || roomId || '0000';
   const displayUrl = url || roomUrl || `https://budcast.live/room/${displayPin}`;
-  const [copied, setCopied] = React.useState(false);
+  const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
     if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.clipboard) {
