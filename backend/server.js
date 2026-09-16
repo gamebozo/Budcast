@@ -887,6 +887,19 @@ io.on('connection', (socket) => {
   });
 });
 
+// Global 404 Handler for API routes
+app.use('/api/*', (req, res) => {
+  res.status(404).json({ error: 'API endpoint not found', path: req.originalUrl });
+});
+
+// Fallback for undefined web routes to serve landing index
+app.use((req, res) => {
+  if (fs.existsSync(landingDir)) {
+    return res.sendFile(path.join(landingDir, 'index.html'));
+  }
+  res.status(404).send('Not found');
+});
+
 server.listen(PORT, '0.0.0.0', () => {
   console.log('====================================================');
   console.log(`🚀 SYNC BACKEND RUNNING ON PORT ${PORT}`);

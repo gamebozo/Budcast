@@ -1,7 +1,6 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Modal, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Modal, Platform, Share } from 'react-native';
 import { QRCodeSVG } from 'qrcode.react';
-import { X, Copy, Check, Users, Shield } from 'lucide-react-native';
+import { X, Copy, Check, Users, Shield, Share2 } from 'lucide-react-native';
 import { BudcastLogo } from './BudcastLogo';
 
 interface Props {
@@ -27,11 +26,23 @@ export const ShareRoomModal: React.FC<Props> = ({
   const displayUrl = url || roomUrl || `https://budcast.live/room/${displayPin}`;
   const [copied, setCopied] = React.useState(false);
 
-  const handleCopy = () => {
+  const handleCopy = async () => {
     if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.clipboard) {
       navigator.clipboard.writeText(displayUrl);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+    } else {
+      try {
+        await Share.share({
+          message: `Join my Budcast live stream room #${displayPin} on zero-latency audio: ${displayUrl}`,
+          url: displayUrl,
+          title: `Budcast Live Room #${displayPin}`,
+        });
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      } catch (e) {
+        console.log('Share error:', e);
+      }
     }
   };
 
