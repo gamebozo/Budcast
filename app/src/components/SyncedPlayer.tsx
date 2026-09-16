@@ -136,6 +136,8 @@ export const SyncedPlayer: React.FC<Props> = ({
   const [skipFeedback, setSkipFeedback] = useState<'left' | 'right' | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showControls, setShowControls] = useState(true);
+  const [videoScrubberWidth, setVideoScrubberWidth] = useState(300);
+  const [audioScrubberWidth, setAudioScrubberWidth] = useState(300);
   const controlsTimeoutRef = useRef<any>(null);
 
   // Auto-hide controls in fullscreen after 3.5s
@@ -394,10 +396,11 @@ export const SyncedPlayer: React.FC<Props> = ({
     }
   };
 
-  const handleScrubberTouch = (event: any) => {
+  const handleScrubberTouch = (event: any, isVideoScrubber = true) => {
     resetControlsTimeout();
     const { locationX } = event.nativeEvent;
-    const barWidth = event.currentTarget ? 300 : Dimensions.get('window').width - 32;
+    const measuredWidth = isVideoScrubber ? videoScrubberWidth : audioScrubberWidth;
+    const barWidth = measuredWidth > 0 ? measuredWidth : Dimensions.get('window').width - 32;
     if (duration > 0 && barWidth > 0) {
       const seekRatio = Math.max(0, Math.min(1, locationX / barWidth));
       const targetTime = seekRatio * duration;
@@ -530,7 +533,11 @@ export const SyncedPlayer: React.FC<Props> = ({
           {/* SINGLE SMOOTH SCRUBBER RAIL */}
           <TouchableOpacity
             activeOpacity={1}
-            onPress={handleScrubberTouch}
+            onLayout={(e) => {
+              const w = e.nativeEvent.layout.width;
+              if (w > 0) setVideoScrubberWidth(w);
+            }}
+            onPress={(e) => handleScrubberTouch(e, true)}
             style={styles.scrubberTouchableArea}
           >
             <View style={styles.scrubberRail}>
@@ -670,7 +677,11 @@ export const SyncedPlayer: React.FC<Props> = ({
             {/* Single Smooth Audio Scrubber Rail */}
             <TouchableOpacity
               activeOpacity={1}
-              onPress={handleScrubberTouch}
+              onLayout={(e) => {
+                const w = e.nativeEvent.layout.width;
+                if (w > 0) setAudioScrubberWidth(w);
+              }}
+              onPress={(e) => handleScrubberTouch(e, false)}
               style={styles.audioScrubberTouchable}
             >
               <View style={styles.audioScrubberRail}>
