@@ -401,7 +401,7 @@ app.get('/api/payment/history', async (req, res) => {
 // 6. Hosted Mobile & Web Razorpay Checkout Page
 app.get('/checkout', (req, res) => {
   const { orderId, planId, planName, amount, billingCycle, hostId } = req.query;
-  const keyId = process.env.RAZORPAY_KEY_ID || 'rzp_live_TYztip7UZ116H1';
+  const keyId = process.env.RAZORPAY_KEY_ID || '';
 
   function escapeHtml(str) {
     if (!str) return '';

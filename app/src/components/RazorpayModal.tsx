@@ -48,7 +48,7 @@ export const RazorpayModal: React.FC<RazorpayModalProps> = ({
 }) => {
   const [loading, setLoading] = useState(true);
   const [orderId, setOrderId] = useState(propOrderId || '');
-  const [keyId, setKeyId] = useState(propKeyId || 'rzp_live_TYztip7UZ116H1');
+  const [keyId, setKeyId] = useState(propKeyId || '');
   const [verifying, setVerifying] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 

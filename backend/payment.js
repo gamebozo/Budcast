@@ -5,17 +5,19 @@ import { createPaymentRecord, updatePaymentSuccess, saveSubscription, getSubscri
 
 dotenv.config();
 
-const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID || 'rzp_test_51BudcastSync';
-const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET || 'BudcastSecretKey2026Test';
+const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID || '';
+const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET || '';
 
 let razorpayInstance = null;
-try {
-  razorpayInstance = new Razorpay({
-    key_id: RAZORPAY_KEY_ID,
-    key_secret: RAZORPAY_KEY_SECRET,
-  });
-} catch (e) {
-  console.warn('[Razorpay] Initialization warning:', e.message);
+if (RAZORPAY_KEY_ID && RAZORPAY_KEY_SECRET) {
+  try {
+    razorpayInstance = new Razorpay({
+      key_id: RAZORPAY_KEY_ID,
+      key_secret: RAZORPAY_KEY_SECRET,
+    });
+  } catch (e) {
+    console.warn('[Razorpay] Initialization warning:', e.message);
+  }
 }
 
 // Plan Pricing Configuration (in INR Paise: ₹1 = 100 paise)

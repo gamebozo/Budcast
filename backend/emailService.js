@@ -242,12 +242,11 @@ export async function sendWelcomeEmail({ email, queueNumber, referralCode, role 
   const subject = `🎧 You're In! Your Budcast VIP Queue Pass (#${queueNumber})`;
   const html = generateWelcomeEmailHtml({ email, queueNumber, referralCode, role });
 
-  // 1. Custom SMTP / Gmail App Password Provider (Prioritized - sends to ANY email)
-  const smtpHost = process.env.SMTP_HOST || 'smtp.gmail.com';
-  const smtpUser = process.env.SMTP_USER || 'akvish052@gmail.com';
-  const smtpPass = process.env.SMTP_PASS || 'zkfzbkiaigxbngfr';
+  const smtpHost = process.env.SMTP_HOST || '';
+  const smtpUser = process.env.SMTP_USER || '';
+  const smtpPass = process.env.SMTP_PASS || '';
   const smtpPort = parseInt(process.env.SMTP_PORT || '587', 10);
-  const fromEmail = process.env.FROM_EMAIL || 'Budcast VIP <akvish052@gmail.com>';
+  const fromEmail = process.env.FROM_EMAIL || 'Budcast VIP <support@budcast.live>';
 
   if (smtpHost && smtpUser && smtpPass) {
     try {
