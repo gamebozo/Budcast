@@ -129,7 +129,7 @@ export default function ActivityHistoryScreen() {
           styles.container,
           {
             paddingTop: Math.max(insets.top + 6, 16),
-            paddingBottom: Math.max(insets.bottom + 65, 80)
+            paddingBottom: Math.max(insets.bottom + 85, 100)
           }
         ]}
         showsVerticalScrollIndicator={false}

@@ -54,7 +54,7 @@ export default function SilentDiscoScreen() {
           styles.container,
           {
             paddingTop: Math.max(insets.top + 6, 16),
-            paddingBottom: Math.max(insets.bottom + 65, 80)
+            paddingBottom: Math.max(insets.bottom + 85, 100)
           }
         ]}
         showsVerticalScrollIndicator={false}
@@ -138,7 +138,7 @@ export default function SilentDiscoScreen() {
 
         {/* Section: Organizer Benefits & Feature Breakdown */}
         <View style={styles.section}>
-          <Text style={styles.sectionHeader}>WHY ORGANIZERS CHOOSE AUVI</Text>
+          <Text style={styles.sectionHeader}>WHY ORGANIZERS CHOOSE BUDCAST</Text>
           <View style={styles.benefitsCard}>
             <View style={styles.benefitRow}>
               <View style={styles.benefitIconBox}>

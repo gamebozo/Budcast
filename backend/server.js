@@ -114,7 +114,35 @@ if (fs.existsSync(landingDir)) {
   app.get('/', (req, res) => {
     res.sendFile(path.join(landingDir, 'index.html'));
   });
+
+  // Razorpay Compliance & Legal Policy Pages
+  app.get(['/terms', '/terms-and-conditions', '/terms.html'], (req, res) => {
+    res.sendFile(path.join(landingDir, 'terms.html'));
+  });
+
+  app.get(['/privacy', '/privacy-policy', '/privacy.html'], (req, res) => {
+    res.sendFile(path.join(landingDir, 'privacy.html'));
+  });
+
+  app.get(['/contact', '/contact-us', '/contact.html', '/support'], (req, res) => {
+    res.sendFile(path.join(landingDir, 'contact.html'));
+  });
+
+  app.get(['/refund', '/refund-policy', '/cancellation-policy', '/refund.html'], (req, res) => {
+    res.sendFile(path.join(landingDir, 'refund.html'));
+  });
+
+  app.get(['/pricing', '/pricing-policy', '/delivery-policy', '/pricing.html'], (req, res) => {
+    res.sendFile(path.join(landingDir, 'pricing.html'));
+  });
 }
+
+// Contact Form Submission Endpoint
+app.post('/api/contact', apiLimiter, (req, res) => {
+  const { name, email, category, phone, subject, message } = req.body || {};
+  console.log('[Contact Desk] Message received from:', email, `[${category || 'General'}]`, subject);
+  return res.json({ success: true, message: 'Message received. We will respond within 24 hours.' });
+});
 
 // Secure Static Uploads Serving
 app.use('/uploads', (req, res, next) => {

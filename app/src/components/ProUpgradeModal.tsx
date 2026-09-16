@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Modal, ScrollView, Platform, ActivityIndicator } from 'react-native';
 import { Crown, Check, X, Sparkles, Zap, Shield, Radio, Users, Headphones, CheckCircle2, CreditCard, AlertCircle } from 'lucide-react-native';
 import { BudcastLogo } from './BudcastLogo';
-import { startRazorpayCheckout } from '../services/razorpay';
+import { RazorpayModal } from './RazorpayModal';
+
 
 interface Props {
   visible: boolean;
@@ -12,34 +13,18 @@ interface Props {
 export const ProUpgradeModal: React.FC<Props> = ({ visible, onClose }) => {
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('yearly');
   const [selectedTier, setSelectedTier] = useState<'pro' | 'business'>('pro');
-  const [loading, setLoading] = useState(false);
+  const [checkoutVisible, setCheckoutVisible] = useState(false);
   const [purchased, setPurchased] = useState(false);
-  const [error, setError] = useState('');
+
+  const getAmountPaise = () => {
+    if (selectedTier === 'pro') {
+      return billingCycle === 'yearly' ? 799900 : 79900;
+    }
+    return billingCycle === 'yearly' ? 2799900 : 279900;
+  };
 
   const handlePurchase = () => {
-    setLoading(true);
-    setError('');
-
-    startRazorpayCheckout({
-      planId: selectedTier,
-      planName: selectedTier === 'business' ? 'Business Enterprise' : 'Organizer Pro',
-      billingCycle,
-      onSuccess: () => {
-        setLoading(false);
-        setPurchased(true);
-        setTimeout(() => {
-          setPurchased(false);
-          onClose();
-        }, 1600);
-      },
-      onError: (err) => {
-        setLoading(false);
-        setError(err || 'Payment failed');
-      },
-      onDismiss: () => {
-        setLoading(false);
-      }
-    });
+    setCheckoutVisible(true);
   };
 
   return (
@@ -164,14 +149,6 @@ export const ProUpgradeModal: React.FC<Props> = ({ visible, onClose }) => {
               </View>
             </View>
 
-            {/* Error banner */}
-            {error ? (
-              <View style={styles.errorBanner}>
-                <AlertCircle size={14} color="#EF4444" />
-                <Text style={styles.errorText}>{error}</Text>
-              </View>
-            ) : null}
-
             {/* Action CTA */}
             <TouchableOpacity
               style={[
@@ -180,29 +157,48 @@ export const ProUpgradeModal: React.FC<Props> = ({ visible, onClose }) => {
               ]}
               onPress={handlePurchase}
               activeOpacity={0.85}
-              disabled={loading}
             >
-              {loading ? (
-                <ActivityIndicator size="small" color="#090A0F" />
-              ) : (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <CreditCard size={16} color="#090A0F" />
-                  <Text style={styles.actionBtnText}>
-                    {purchased ? '✓ Plan Activated!' : `Pay Now`}
-                  </Text>
-                </View>
-              )}
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <CreditCard size={16} color="#090A0F" />
+                <Text style={styles.actionBtnText}>
+                  {purchased ? '✓ Plan Activated!' : `Pay Now`}
+                </Text>
+              </View>
             </TouchableOpacity>
+
 
             <Text style={styles.legalNotice}>
               Cancel anytime. Instant activation for all your events.
             </Text>
           </ScrollView>
+
+          {/* Official Razorpay In-App Checkout Modal */}
+          <RazorpayModal
+            visible={checkoutVisible}
+            planId={selectedTier}
+            planName={selectedTier === 'business' ? 'Business Enterprise' : 'Organizer Pro'}
+            billingCycle={billingCycle}
+            amountPaise={getAmountPaise()}
+            onSuccess={() => {
+              setCheckoutVisible(false);
+              setPurchased(true);
+              setTimeout(() => {
+                setPurchased(false);
+                onClose();
+              }, 1600);
+            }}
+            onError={() => {
+              setCheckoutVisible(false);
+            }}
+            onClose={() => setCheckoutVisible(false)}
+          />
         </View>
       </View>
     </Modal>
   );
 };
+
+
 
 const styles = StyleSheet.create({
   modalOverlay: {

@@ -1,18 +1,37 @@
-import React, { useEffect, useRef, useState, useImperativeHandle, forwardRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Platform, ActivityIndicator } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Platform,
+  Dimensions,
+  StatusBar,
+  BackHandler,
+  Modal,
+  TouchableWithoutFeedback,
+} from 'react-native';
+import * as ScreenOrientation from 'expo-screen-orientation';
 import { MediaItem, MediaMode, PlaybackState, SyncEvent } from '../types/sync';
 import { syncEngine } from '../services/syncEngine';
 import {
-  Play, Pause, Volume2, VolumeX, Maximize, Minimize,
-  RotateCcw, RotateCw, Sparkles, Radio, Activity, Music,
-  Zap, AlertCircle, Film
+  Play,
+  Pause,
+  Volume2,
+  VolumeX,
+  Maximize,
+  Minimize,
+  RotateCcw,
+  RotateCw,
+  Radio,
+  Zap,
+  Film,
+  X,
 } from 'lucide-react-native';
 
 // Safe dynamic imports for native video & audio
 let VideoViewComponent: any = null;
 let useVideoPlayerHook: any = null;
-let useAudioPlayerHook: any = null;
-let useAudioPlayerStatusHook: any = null;
 
 if (Platform.OS !== 'web') {
   try {
@@ -21,13 +40,6 @@ if (Platform.OS !== 'web') {
     useVideoPlayerHook = videoMod.useVideoPlayer;
   } catch (e) {
     console.log('[SyncedPlayer] expo-video load notice:', e);
-  }
-  try {
-    const audioMod = require('expo-audio');
-    useAudioPlayerHook = audioMod.useAudioPlayer;
-    useAudioPlayerStatusHook = audioMod.useAudioPlayerStatus;
-  } catch (e) {
-    console.log('[SyncedPlayer] expo-audio load notice:', e);
   }
 }
 
@@ -42,6 +54,7 @@ interface Props {
 
 /**
  * Native Video Player sub-component using expo-video
+ * NOTE: nativeControls={false} is critical to keep ONLY ONE single smooth progress bar!
  */
 const NativeVideoPlayer: React.FC<{
   url: string;
@@ -49,7 +62,8 @@ const NativeVideoPlayer: React.FC<{
   onTimeUpdate: (cur: number, dur: number) => void;
   onPlayStateChange: (playing: boolean) => void;
   playerRef: React.MutableRefObject<any>;
-}> = ({ url, isMuted, onTimeUpdate, onPlayStateChange, playerRef }) => {
+  isFullscreen?: boolean;
+}> = ({ url, isMuted, onTimeUpdate, onPlayStateChange, playerRef, isFullscreen }) => {
   if (!useVideoPlayerHook || !VideoViewComponent) {
     return (
       <View style={styles.fallbackBox}>
@@ -90,9 +104,9 @@ const NativeVideoPlayer: React.FC<{
   return (
     <VideoViewComponent
       player={player}
-      style={styles.nativeVideo}
-      allowsFullscreen
-      allowsPictureInPicture
+      style={isFullscreen ? styles.fullscreenNativeVideo : styles.nativeVideo}
+      nativeControls={false}
+      allowsFullscreen={false}
       contentFit="contain"
     />
   );
@@ -104,19 +118,120 @@ export const SyncedPlayer: React.FC<Props> = ({
   isHost,
   onHostAction,
   syncEvent,
-  initialPlaybackState
+  initialPlaybackState,
 }) => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const webContainerRef = useRef<HTMLDivElement | null>(null);
   const nativePlayerRef = useRef<any>(null);
 
-  const [isPlaying, setIsPlaying] = useState<boolean>(initialPlaybackState !== undefined ? initialPlaybackState.isPlaying : true);
+  const [isPlaying, setIsPlaying] = useState<boolean>(
+    initialPlaybackState !== undefined ? initialPlaybackState.isPlaying : true
+  );
   const [currentTime, setCurrentTime] = useState(initialPlaybackState?.currentTime || 0);
   const [duration, setDuration] = useState(media.duration || 0);
   const [isMuted, setIsMuted] = useState(false);
   const [audioBoost, setAudioBoost] = useState(false);
   const [driftMs, setDriftMs] = useState(0);
   const [skipFeedback, setSkipFeedback] = useState<'left' | 'right' | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showControls, setShowControls] = useState(true);
+  const controlsTimeoutRef = useRef<any>(null);
+
+  // Auto-hide controls in fullscreen after 3.5s
+  const resetControlsTimeout = () => {
+    setShowControls(true);
+    if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
+    controlsTimeoutRef.current = setTimeout(() => {
+      if (isPlaying) setShowControls(false);
+    }, 3500);
+  };
+
+  useEffect(() => {
+    if (isFullscreen) {
+      resetControlsTimeout();
+    } else {
+      setShowControls(true);
+    }
+  }, [isFullscreen, isPlaying]);
+
+  // YouTube-Style Screen Orientation Listener for Auto-Rotation
+  useEffect(() => {
+    let orientationSubscription: any = null;
+
+    if (Platform.OS !== 'web' && mode === 'video') {
+      try {
+        ScreenOrientation.unlockAsync().catch(() => {});
+
+        orientationSubscription = ScreenOrientation.addOrientationChangeListener((evt) => {
+          const orientation = evt.orientationInfo.orientation;
+          const isLandscape =
+            orientation === ScreenOrientation.Orientation.LANDSCAPE_LEFT ||
+            orientation === ScreenOrientation.Orientation.LANDSCAPE_RIGHT;
+
+          setIsFullscreen(isLandscape);
+        });
+      } catch (e) {
+        console.log('[Orientation Error]:', e);
+      }
+    }
+
+    return () => {
+      if (orientationSubscription) {
+        ScreenOrientation.removeOrientationChangeListener(orientationSubscription);
+      }
+      if (Platform.OS !== 'web') {
+        ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => {});
+      }
+    };
+  }, [mode]);
+
+  // Android Hardware Back Button to Exit Fullscreen
+  useEffect(() => {
+    if (!isFullscreen) return;
+
+    const onBackPress = () => {
+      toggleFullscreen();
+      return true;
+    };
+
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => backHandler.remove();
+  }, [isFullscreen]);
+
+  // Toggle Fullscreen Function (Rotate & Expand)
+  const toggleFullscreen = async () => {
+    const nextState = !isFullscreen;
+    setIsFullscreen(nextState);
+
+    if (Platform.OS === 'web') {
+      if (nextState) {
+        const elem = webContainerRef.current || (videoRef.current as any);
+        if (elem?.requestFullscreen) {
+          elem.requestFullscreen().catch(() => {});
+        }
+      } else {
+        if (document.fullscreenElement) {
+          document.exitFullscreen().catch(() => {});
+        }
+      }
+    } else {
+      try {
+        if (nextState) {
+          // Lock to Landscape on Fullscreen
+          await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
+        } else {
+          // Return to Portrait when exiting
+          await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+          setTimeout(() => {
+            ScreenOrientation.unlockAsync().catch(() => {});
+          }, 600);
+        }
+      } catch (err) {
+        console.log('[ScreenOrientation Error]:', err);
+      }
+    }
+  };
 
   // Sync event listener from socket
   useEffect(() => {
@@ -136,13 +251,13 @@ export const SyncedPlayer: React.FC<Props> = ({
 
         if (delayMs > 0) {
           setTimeout(() => {
-            mediaEl.play().catch(e => console.log('Web play err:', e));
+            mediaEl.play().catch((e) => console.log('Web play err:', e));
             setIsPlaying(true);
           }, delayMs);
         } else {
           const elapsedSec = Math.max(0, -delayMs / 1000);
           mediaEl.currentTime = (syncEvent.currentTime || 0) + elapsedSec;
-          mediaEl.play().catch(e => console.log('Web play err:', e));
+          mediaEl.play().catch((e) => console.log('Web play err:', e));
           setIsPlaying(true);
         }
       } else if (syncEvent.action === 'PAUSE') {
@@ -157,7 +272,7 @@ export const SyncedPlayer: React.FC<Props> = ({
           setCurrentTime(syncEvent.currentTime);
         }
         if (syncEvent.isPlaying) {
-          mediaEl.play().catch(e => console.log('Seek play:', e));
+          mediaEl.play().catch((e) => console.log('Seek play:', e));
           setIsPlaying(true);
         }
       }
@@ -211,18 +326,20 @@ export const SyncedPlayer: React.FC<Props> = ({
   }, [mode]);
 
   const togglePlay = () => {
+    resetControlsTimeout();
     if (Platform.OS === 'web') {
       const mediaEl = mode === 'video' ? videoRef.current : audioRef.current;
       if (!mediaEl) return;
 
       if (isHost) {
         if (mediaEl.paused) {
-          mediaEl.play()
+          mediaEl
+            .play()
             .then(() => {
               setIsPlaying(true);
               if (onHostAction) onHostAction('PLAY', { currentTime: mediaEl.currentTime, delay: 100 });
             })
-            .catch(err => console.error('Play error:', err));
+            .catch((err) => console.error('Play error:', err));
         } else {
           mediaEl.pause();
           setIsPlaying(false);
@@ -230,7 +347,7 @@ export const SyncedPlayer: React.FC<Props> = ({
         }
       } else {
         if (mediaEl.paused) {
-          mediaEl.play().then(() => setIsPlaying(true)).catch(e => console.log(e));
+          mediaEl.play().then(() => setIsPlaying(true)).catch((e) => console.log(e));
         } else {
           mediaEl.pause();
           setIsPlaying(false);
@@ -254,6 +371,7 @@ export const SyncedPlayer: React.FC<Props> = ({
   };
 
   const handleSeekJump = (seconds: number) => {
+    resetControlsTimeout();
     const targetTime = Math.max(0, Math.min(duration || 9999, currentTime + seconds));
     setCurrentTime(targetTime);
 
@@ -276,6 +394,32 @@ export const SyncedPlayer: React.FC<Props> = ({
     }
   };
 
+  const handleScrubberTouch = (event: any) => {
+    resetControlsTimeout();
+    const { locationX } = event.nativeEvent;
+    const barWidth = event.currentTarget ? 300 : Dimensions.get('window').width - 32;
+    if (duration > 0 && barWidth > 0) {
+      const seekRatio = Math.max(0, Math.min(1, locationX / barWidth));
+      const targetTime = seekRatio * duration;
+      setCurrentTime(targetTime);
+
+      if (Platform.OS === 'web') {
+        const mediaEl = mode === 'video' ? videoRef.current : audioRef.current;
+        if (mediaEl) mediaEl.currentTime = targetTime;
+      } else {
+        const p = nativePlayerRef.current;
+        if (p) {
+          if (p.currentTime !== undefined) p.currentTime = targetTime;
+          else if (p.seekTo) p.seekTo(targetTime);
+        }
+      }
+
+      if (isHost && onHostAction) {
+        onHostAction('SEEK', { currentTime: targetTime, delay: 100, isPlaying });
+      }
+    }
+  };
+
   const toggleMute = () => {
     const nextMuted = !isMuted;
     setIsMuted(nextMuted);
@@ -295,117 +439,193 @@ export const SyncedPlayer: React.FC<Props> = ({
     return `${m}:${s < 10 ? '0' : ''}${s}`;
   };
 
-  const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
+  const progressPercent = duration > 0 ? Math.min(100, (currentTime / duration) * 100) : 0;
+
+  // Video Player Content Elements
+  const renderVideoPlayerElement = (isModalFullscreen: boolean) => {
+    if (Platform.OS === 'web') {
+      return (
+        <video
+          ref={videoRef}
+          src={media.url}
+          playsInline
+          autoPlay
+          preload="auto"
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'contain',
+            backgroundColor: '#000',
+            cursor: 'pointer',
+          }}
+          onPlay={() => setIsPlaying(true)}
+          onPause={() => setIsPlaying(false)}
+          onLoadedMetadata={(e: any) => {
+            if (e.target.duration && !isNaN(e.target.duration)) {
+              setDuration(e.target.duration);
+            }
+          }}
+          onClick={togglePlay}
+        />
+      );
+    }
+
+    return (
+      <NativeVideoPlayer
+        url={media.url}
+        isMuted={isMuted}
+        playerRef={nativePlayerRef}
+        isFullscreen={isModalFullscreen}
+        onTimeUpdate={(cur, dur) => {
+          setCurrentTime(cur);
+          if (dur > 0) setDuration(dur);
+        }}
+        onPlayStateChange={(playing) => setIsPlaying(playing)}
+      />
+    );
+  };
+
+  // Video Controls Overlay (Single Smooth Scrubber + Buttons)
+  const renderVideoControlsOverlay = (isModalFullscreen: boolean) => {
+    if (!showControls && isModalFullscreen) return null;
+
+    return (
+      <View style={styles.controlsOverlayContainer} pointerEvents="box-none">
+        {/* Top Overlay */}
+        <View style={styles.topOverlay}>
+          <Text style={styles.mediaTitle} numberOfLines={1}>
+            {media.title}
+          </Text>
+          <View style={styles.topRightRow}>
+            <View style={styles.lockBadge}>
+              <View style={styles.lockDot} />
+              <Text style={styles.lockText}>
+                {isHost ? 'HOST STREAM' : driftMs < 40 ? 'EARBUDS LOCKED' : `${driftMs}ms`}
+              </Text>
+            </View>
+            {isModalFullscreen && (
+              <TouchableOpacity onPress={toggleFullscreen} style={styles.exitBtn}>
+                <X size={18} color="#FFF" />
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+
+        {/* Skip Feedback Animation */}
+        {skipFeedback === 'left' && (
+          <View style={[styles.skipBadge, { left: '15%' }]}>
+            <RotateCcw size={16} color="#38BDF8" />
+            <Text style={styles.skipText}>-10s</Text>
+          </View>
+        )}
+        {skipFeedback === 'right' && (
+          <View style={[styles.skipBadge, { right: '15%' }]}>
+            <Text style={styles.skipText}>+10s</Text>
+            <RotateCw size={16} color="#38BDF8" />
+          </View>
+        )}
+
+        {/* Bottom Controls Bar */}
+        <View style={styles.bottomControlsBar}>
+          {/* SINGLE SMOOTH SCRUBBER RAIL */}
+          <TouchableOpacity
+            activeOpacity={1}
+            onPress={handleScrubberTouch}
+            style={styles.scrubberTouchableArea}
+          >
+            <View style={styles.scrubberRail}>
+              <View style={[styles.scrubberProgress, { width: `${progressPercent}%` }]} />
+              <View
+                style={[
+                  styles.scrubberThumb,
+                  { left: `${Math.max(0, Math.min(98, progressPercent))}%` },
+                ]}
+              />
+            </View>
+          </TouchableOpacity>
+
+          <View style={styles.controlsRow}>
+            {/* Play / 10s Rewind / 10s Forward / Timecode */}
+            <View style={styles.controlsLeft}>
+              <TouchableOpacity onPress={togglePlay} style={styles.iconBtn}>
+                {isPlaying ? <Pause size={18} color="#FFF" /> : <Play size={18} color="#FFF" />}
+              </TouchableOpacity>
+
+              <TouchableOpacity onPress={() => handleSeekJump(-10)} style={styles.iconBtn}>
+                <RotateCcw size={15} color="#CBD5E1" />
+              </TouchableOpacity>
+
+              <TouchableOpacity onPress={() => handleSeekJump(10)} style={styles.iconBtn}>
+                <RotateCw size={15} color="#CBD5E1" />
+              </TouchableOpacity>
+
+              <TouchableOpacity onPress={toggleMute} style={styles.iconBtn}>
+                {isMuted ? <VolumeX size={16} color="#EF4444" /> : <Volume2 size={16} color="#CBD5E1" />}
+              </TouchableOpacity>
+
+              <Text style={styles.timecodeText}>
+                {formatTime(currentTime)} / {formatTime(duration)}
+              </Text>
+            </View>
+
+            {/* Right controls: Boost badge & Fullscreen Toggle */}
+            <View style={styles.controlsRight}>
+              <TouchableOpacity
+                onPress={() => setAudioBoost(!audioBoost)}
+                style={[styles.boostBadge, audioBoost && styles.boostBadgeActive]}
+              >
+                <Zap size={11} color={audioBoost ? '#38BDF8' : '#94A3B8'} />
+                <Text style={[styles.boostText, audioBoost && { color: '#38BDF8' }]}>BOOST</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity onPress={toggleFullscreen} style={styles.fullscreenBtn}>
+                {isModalFullscreen ? (
+                  <Minimize size={17} color="#FFF" />
+                ) : (
+                  <Maximize size={17} color="#FFF" />
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </View>
+    );
+  };
 
   return (
     <View style={styles.container}>
+      {/* 1. ROOT FULLSCREEN MODAL (YouTube-Style Immersive Landscape Player) */}
+      {mode === 'video' && isFullscreen && (
+        <Modal
+          visible={isFullscreen}
+          transparent={false}
+          animationType="fade"
+          statusBarTranslucent={true}
+          onRequestClose={toggleFullscreen}
+        >
+          <StatusBar hidden={true} />
+          <TouchableWithoutFeedback onPress={resetControlsTimeout}>
+            <View style={styles.rootFullscreenModal}>
+              {renderVideoPlayerElement(true)}
+              {renderVideoControlsOverlay(true)}
+            </View>
+          </TouchableWithoutFeedback>
+        </Modal>
+      )}
+
+      {/* 2. IN-LINE PORTRAIT PLAYER */}
       <View style={styles.stage}>
-        {/* VIDEO MODE */}
         {mode === 'video' ? (
-          <View style={styles.videoWrapper}>
-            {Platform.OS === 'web' ? (
-              <video
-                ref={videoRef}
-                src={media.url}
-                playsInline
-                autoPlay
-                preload="auto"
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  objectFit: 'contain',
-                  backgroundColor: '#000',
-                  cursor: 'pointer'
-                }}
-                onPlay={() => setIsPlaying(true)}
-                onPause={() => setIsPlaying(false)}
-                onLoadedMetadata={(e: any) => {
-                  if (e.target.duration && !isNaN(e.target.duration)) {
-                    setDuration(e.target.duration);
-                  }
-                }}
-                onClick={togglePlay}
-              />
-            ) : (
-              <NativeVideoPlayer
-                url={media.url}
-                isMuted={isMuted}
-                playerRef={nativePlayerRef}
-                onTimeUpdate={(cur, dur) => {
-                  setCurrentTime(cur);
-                  if (dur > 0) setDuration(dur);
-                }}
-                onPlayStateChange={(playing) => setIsPlaying(playing)}
-              />
-            )}
-
-            {/* Top Bar Overlay */}
-            <View style={styles.topOverlay}>
-              <Text style={styles.mediaTitle} numberOfLines={1}>{media.title}</Text>
-              <View style={styles.lockBadge}>
-                <View style={styles.lockDot} />
-                <Text style={styles.lockText}>
-                  {isHost ? 'HOST STREAM' : driftMs < 40 ? 'EARBUDS LOCKED' : `${driftMs}ms`}
-                </Text>
-              </View>
+          <TouchableWithoutFeedback onPress={resetControlsTimeout}>
+            <View
+              // @ts-ignore
+              ref={webContainerRef}
+              style={styles.videoWrapper}
+            >
+              {renderVideoPlayerElement(false)}
+              {renderVideoControlsOverlay(false)}
             </View>
-
-            {/* Skip Feedback Icons */}
-            {skipFeedback === 'left' && (
-              <View style={[styles.skipBadge, { left: '15%' }]}>
-                <RotateCcw size={16} color="#38BDF8" />
-                <Text style={styles.skipText}>-10s</Text>
-              </View>
-            )}
-            {skipFeedback === 'right' && (
-              <View style={[styles.skipBadge, { right: '15%' }]}>
-                <Text style={styles.skipText}>+10s</Text>
-                <RotateCw size={16} color="#38BDF8" />
-              </View>
-            )}
-
-            {/* Bottom Controls Bar */}
-            <View style={styles.bottomControlsBar}>
-              {/* Scrubber Track */}
-              <View style={styles.scrubberRail}>
-                <View style={[styles.scrubberProgress, { width: `${progressPercent}%` }]} />
-              </View>
-
-              <View style={styles.controlsRow}>
-                {/* Play / 10s Rewind / 10s Forward / Timecode */}
-                <View style={styles.controlsLeft}>
-                  <TouchableOpacity onPress={togglePlay} style={styles.iconBtn}>
-                    {isPlaying ? <Pause size={18} color="#FFF" /> : <Play size={18} color="#FFF" />}
-                  </TouchableOpacity>
-
-                  <TouchableOpacity onPress={() => handleSeekJump(-10)} style={styles.iconBtn}>
-                    <RotateCcw size={15} color="#CBD5E1" />
-                  </TouchableOpacity>
-
-                  <TouchableOpacity onPress={() => handleSeekJump(10)} style={styles.iconBtn}>
-                    <RotateCw size={15} color="#CBD5E1" />
-                  </TouchableOpacity>
-
-                  <TouchableOpacity onPress={toggleMute} style={styles.iconBtn}>
-                    {isMuted ? <VolumeX size={16} color="#EF4444" /> : <Volume2 size={16} color="#CBD5E1" />}
-                  </TouchableOpacity>
-
-                  <Text style={styles.timecodeText}>
-                    {formatTime(currentTime)} / {formatTime(duration)}
-                  </Text>
-                </View>
-
-                {/* Right controls: Boost badge */}
-                <TouchableOpacity
-                  onPress={() => setAudioBoost(!audioBoost)}
-                  style={[styles.boostBadge, audioBoost && styles.boostBadgeActive]}
-                >
-                  <Zap size={11} color={audioBoost ? '#38BDF8' : '#94A3B8'} />
-                  <Text style={[styles.boostText, audioBoost && { color: '#38BDF8' }]}>BOOST</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
+          </TouchableWithoutFeedback>
         ) : (
           /* AUDIO / SILENT DISCO MODE */
           <View style={styles.audioStage}>
@@ -428,6 +648,7 @@ export const SyncedPlayer: React.FC<Props> = ({
                 url={media.url}
                 isMuted={isMuted}
                 playerRef={nativePlayerRef}
+                isFullscreen={false}
                 onTimeUpdate={(cur, dur) => {
                   setCurrentTime(cur);
                   if (dur > 0) setDuration(dur);
@@ -446,10 +667,16 @@ export const SyncedPlayer: React.FC<Props> = ({
               Earbud Synchronized Broadcast • {formatTime(currentTime)} / {formatTime(duration)}
             </Text>
 
-            {/* Audio Scrubber Rail */}
-            <View style={styles.audioScrubberRail}>
-              <View style={[styles.audioScrubberProgress, { width: `${progressPercent}%` }]} />
-            </View>
+            {/* Single Smooth Audio Scrubber Rail */}
+            <TouchableOpacity
+              activeOpacity={1}
+              onPress={handleScrubberTouch}
+              style={styles.audioScrubberTouchable}
+            >
+              <View style={styles.audioScrubberRail}>
+                <View style={[styles.audioScrubberProgress, { width: `${progressPercent}%` }]} />
+              </View>
+            </TouchableOpacity>
 
             {/* Audio Buttons */}
             <View style={styles.audioControlsRow}>
@@ -480,6 +707,14 @@ const styles = StyleSheet.create({
   container: {
     width: '100%',
   },
+  rootFullscreenModal: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#000000',
+    position: 'relative',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   stage: {
     width: '100%',
     borderRadius: 16,
@@ -492,7 +727,7 @@ const styles = StyleSheet.create({
     width: '100%',
     aspectRatio: 16 / 9,
     position: 'relative',
-    backgroundColor: '#000',
+    backgroundColor: '#000000',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -500,6 +735,20 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
+  fullscreenNativeVideo: {
+    width: '100%',
+    height: '100%',
+  },
+  controlsOverlayContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'space-between',
+    zIndex: 30,
+  },
+
   fallbackBox: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -512,16 +761,21 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   topOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
     padding: 10,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: 'rgba(0, 0, 0, 0.65)',
-    zIndex: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+  },
+  topRightRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  exitBtn: {
+    padding: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    borderRadius: 16,
   },
   mediaTitle: {
     color: '#FFF',
@@ -563,7 +817,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    zIndex: 25,
+    zIndex: 35,
   },
   skipText: {
     color: '#38BDF8',
@@ -571,39 +825,62 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   bottomControlsBar: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
     paddingHorizontal: 10,
     paddingVertical: 8,
     backgroundColor: 'rgba(0, 0, 0, 0.8)',
-    zIndex: 20,
+  },
+  scrubberTouchableArea: {
+    width: '100%',
+    paddingVertical: 8,
+    justifyContent: 'center',
   },
   scrubberRail: {
     width: '100%',
-    height: 3,
+    height: 4,
     backgroundColor: 'rgba(255, 255, 255, 0.25)',
     borderRadius: 2,
-    marginBottom: 6,
-    overflow: 'hidden',
+    position: 'relative',
+    justifyContent: 'center',
   },
   scrubberProgress: {
     height: '100%',
     backgroundColor: '#38BDF8',
+    borderRadius: 2,
+  },
+  scrubberThumb: {
+    position: 'absolute',
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#38BDF8',
+    top: -3,
+    marginLeft: -5,
   },
   controlsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    marginTop: 2,
   },
   controlsLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
   },
+  controlsRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   iconBtn: {
     padding: 2,
+  },
+  fullscreenBtn: {
+    padding: 4,
+    borderRadius: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   timecodeText: {
     color: '#E2E8F0',
@@ -663,12 +940,15 @@ const styles = StyleSheet.create({
     fontSize: 11,
     marginBottom: 12,
   },
-  audioScrubberRail: {
+  audioScrubberTouchable: {
     width: '90%',
+    paddingVertical: 6,
+  },
+  audioScrubberRail: {
+    width: '100%',
     height: 3,
     backgroundColor: 'rgba(255, 255, 255, 0.15)',
     borderRadius: 2,
-    marginBottom: 14,
     overflow: 'hidden',
   },
   audioScrubberProgress: {
@@ -679,6 +959,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 16,
+    marginTop: 8,
   },
   audioRoundBtn: {
     width: 36,
@@ -699,3 +980,5 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 });
+
+

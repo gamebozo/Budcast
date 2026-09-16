@@ -12,26 +12,42 @@ import {
 } from 'lucide-react-native';
 import { FloatingNavBar } from '../components/FloatingNavBar';
 import { BudcastLogo } from '../components/BudcastLogo';
-import { startRazorpayCheckout } from '../services/razorpay';
+import { RazorpayModal } from '../components/RazorpayModal';
 import { getActivePlan, setActivePlan, ActivePlanData } from '../services/hostStorage';
+
 
 export default function ProScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('yearly');
   const [currentPlan, setCurrentPlan] = useState<ActivePlanData>(getActivePlan());
-  const [loading, setLoading] = useState<boolean>(false);
-  const [loadingPlanId, setLoadingPlanId] = useState<string | null>(null);
   const [paymentSuccess, setPaymentSuccess] = useState<string>('');
   const [paymentError, setPaymentError] = useState<string>('');
+  const [checkoutModalVisible, setCheckoutModalVisible] = useState<boolean>(false);
+  const [selectedPlanDetails, setSelectedPlanDetails] = useState<{
+    planId: 'pro' | 'business';
+    planName: string;
+    amountPaise: number;
+  } | null>(null);
 
   useEffect(() => {
     setCurrentPlan(getActivePlan());
-    // Preload checkout script for instant modal opening
-    if (Platform.OS === 'web') {
-      import('../services/razorpay').then((mod) => mod.loadRazorpayScript());
-    }
   }, []);
+
+  // Auto dismiss feedback banners after 6 seconds
+  useEffect(() => {
+    if (paymentSuccess) {
+      const timer = setTimeout(() => setPaymentSuccess(''), 6000);
+      return () => clearTimeout(timer);
+    }
+  }, [paymentSuccess]);
+
+  useEffect(() => {
+    if (paymentError) {
+      const timer = setTimeout(() => setPaymentError(''), 6000);
+      return () => clearTimeout(timer);
+    }
+  }, [paymentError]);
 
   const handlePlanAction = (planId: string, planName: string) => {
     setPaymentError('');
@@ -51,32 +67,20 @@ export default function ProScreen() {
       return;
     }
 
-    // Directly start Razorpay checkout - No intermediate popup modal
-    setLoading(true);
-    setLoadingPlanId(planId);
-    setPaymentError('');
+    // Calculate amount in Paise
+    let amountPaise = 799900;
+    if (planId === 'pro') {
+      amountPaise = billingCycle === 'yearly' ? 799900 : 79900;
+    } else if (planId === 'business') {
+      amountPaise = billingCycle === 'yearly' ? 2799900 : 279900;
+    }
 
-    startRazorpayCheckout({
+    setSelectedPlanDetails({
       planId: planId as 'pro' | 'business',
       planName,
-      billingCycle,
-      onSuccess: (data) => {
-        setLoading(false);
-        setLoadingPlanId(null);
-        const updated = getActivePlan();
-        setCurrentPlan(updated);
-        setPaymentSuccess(`🎉 Successfully activated ${planName}!`);
-      },
-      onError: (err) => {
-        setLoading(false);
-        setLoadingPlanId(null);
-        setPaymentError(err || 'Payment was not completed.');
-      },
-      onDismiss: () => {
-        setLoading(false);
-        setLoadingPlanId(null);
-      }
+      amountPaise,
     });
+    setCheckoutModalVisible(true);
   };
 
   const plans = [
@@ -159,7 +163,7 @@ export default function ProScreen() {
           styles.container,
           {
             paddingTop: Math.max(insets.top + 6, 16),
-            paddingBottom: Math.max(insets.bottom + 65, 80)
+            paddingBottom: Math.max(insets.bottom + 85, 100)
           }
         ]}
         showsVerticalScrollIndicator={false}
@@ -221,6 +225,9 @@ export default function ProScreen() {
           <View style={styles.successBanner}>
             <CheckCircle2 size={18} color="#10B981" />
             <Text style={styles.successBannerText}>{paymentSuccess}</Text>
+            <TouchableOpacity onPress={() => setPaymentSuccess('')} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+              <X size={16} color="#10B981" />
+            </TouchableOpacity>
           </View>
         ) : null}
 
@@ -228,6 +235,9 @@ export default function ProScreen() {
           <View style={styles.errorBanner}>
             <AlertCircle size={18} color="#EF4444" />
             <Text style={styles.errorBannerText}>{paymentError}</Text>
+            <TouchableOpacity onPress={() => setPaymentError('')} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+              <X size={16} color="#EF4444" />
+            </TouchableOpacity>
           </View>
         ) : null}
 
@@ -329,19 +339,16 @@ export default function ProScreen() {
                   ]}
                   onPress={() => handlePlanAction(plan.id, plan.name)}
                   activeOpacity={0.85}
-                  disabled={loading || plan.isCurrent}
+                  disabled={plan.isCurrent}
                 >
-                  {loading && loadingPlanId === plan.id ? (
-                    <ActivityIndicator size="small" color="#090A0F" />
-                  ) : (
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                      {!plan.isCurrent && plan.id !== 'free' && <CreditCard size={15} color="#090A0F" />}
-                      <Text style={[styles.ctaButtonText, plan.isCurrent && { color: '#94A3B8' }]}>
-                        {plan.isCurrent ? 'Active Current Plan' : plan.ctaText}
-                      </Text>
-                    </View>
-                  )}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    {!plan.isCurrent && plan.id !== 'free' && <CreditCard size={15} color="#090A0F" />}
+                    <Text style={[styles.ctaButtonText, plan.isCurrent && { color: '#94A3B8' }]}>
+                      {plan.isCurrent ? 'Active Current Plan' : plan.ctaText}
+                    </Text>
+                  </View>
                 </TouchableOpacity>
+
               </View>
             );
           })}
@@ -382,11 +389,35 @@ export default function ProScreen() {
         <View style={{ height: 100 }} />
       </ScrollView>
 
+      {/* Official In-App Razorpay Modal */}
+      {selectedPlanDetails && (
+        <RazorpayModal
+          visible={checkoutModalVisible}
+          planId={selectedPlanDetails.planId}
+          planName={selectedPlanDetails.planName}
+          billingCycle={billingCycle}
+          amountPaise={selectedPlanDetails.amountPaise}
+          onSuccess={(data) => {
+            setCheckoutModalVisible(false);
+            const updated = getActivePlan();
+            setCurrentPlan(updated);
+            setPaymentSuccess(`🎉 Successfully activated ${selectedPlanDetails.planName}!`);
+          }}
+          onError={(err) => {
+            setCheckoutModalVisible(false);
+            setPaymentError(err || 'Payment was cancelled or failed.');
+          }}
+          onClose={() => setCheckoutModalVisible(false)}
+        />
+      )}
+
+
       {/* Floating Bottom Nav */}
       <FloatingNavBar />
     </View>
   );
 }
+
 
 const styles = StyleSheet.create({
   safeArea: {
